@@ -1,80 +1,30 @@
-# Skyland CRM
+# Skyland Dashboard
 
-Ett modernt CRM-system anpassat för marinmekaniker, byggt för att hantera kunder, båtar, arbetsordrar och kommunikation effektivt.
+Operativ dashboard för Skyland AI. Visar leads från void-submission-flödet i realtid och hanterar aktiva klient-engagements.
 
-## 🏗 Arkitektur
+## Stack
 
-Projektet har migrerats från en FastAPI-backend till en serverless-arkitektur med **Supabase**.
+- React 19 (Create React App / CRACO)
+- Tailwind CSS
+- Radix UI
+- Supabase (Auth + Realtime + Postgres)
+- TanStack React Query
+- Lucide Icons
 
-* **Frontend:** React (Create React App), Tailwind CSS, Lucide Icons.
-* **Databas & Backend:** Supabase (PostgreSQL, Auth, Realtime, API).
-* **Automation & AI:** n8n (Webhooks, e-posthantering, AI-klassificering av leads).
+## Utveckling
 
-## 🚀 Kom igång
+```bash
+cd frontend
+yarn install
+yarn start
+```
 
-### Förutsättningar
+Kräver `.env` med:
+```
+REACT_APP_SUPABASE_URL=https://ydlpqlrcriayzgtxzmvy.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=...
+```
 
-* Node.js (v18 eller senare)
-* npm
+## Deployment
 
-### Installation
-
-1. Klona repot:
-
-    ```bash
-    git clone https://github.com/Onepiecedad/Skyland_CRM.git
-    cd Skyland_CRM
-    ```
-
-2. Installera frontend-beroenden:
-
-    ```bash
-    cd frontend
-    npm install
-    ```
-
-3. Konfigurera miljövariabler:
-    Skapa en fil `.env` i `frontend/`-mappen och lägg till dina Supabase-nycklar (finns i Supabase Dashboard):
-
-    ```env
-    REACT_APP_SUPABASE_URL=https://ditt-project-id.supabase.co
-    REACT_APP_SUPABASE_ANON_KEY=din-anon-key
-    ```
-
-    *(Obs: `WDS_SOCKET_PORT=0` kan behövas lokalt för att undvika WebSocket-fel).*
-
-4. Starta applikationen:
-
-    ```bash
-    npm start
-    ```
-
-    Appen öppnas på `http://localhost:3000`.
-
-## 🗄 Databas (Supabase)
-
-Databasstrukturen definieras i `skyland_crm_schema.sql`. Den innehåller tabeller för:
-
-* `customers` - Kundregister
-* `boats` - Båtar kopplade till kunder
-* `leads` - Inkommande förfrågningar (AI-sorterade)
-* `jobs` - Arbetsordrar
-* `inbox` - Staging för inkommande meddelanden
-* `activity_log` - Historik över händelser
-
-En vy `customers_overview` används för att aggregera statistik till kundlitan.
-
-## 🤖 Automation (n8n)
-
-Systemet förlitar sig på n8n för backend-logik:
-
-1. **Lead Scoring:** Tar emot data via webhook, kör AI-analys, sparar i Supabase.
-2. **Notiser:** Skickar notiser (t.ex. Telegram) vid nya leads.
-3. **E-post:** Syncar inkommande mail till `inbox`-tabellen.
-
-## 📂 Projektstruktur
-
-* `/frontend` - React-applikationen.
-* `skyland_crm_schema.sql` - SQL-script för att sätta upp databasen.
-* `SUPABASE_SCHEMA.md` - Dokumentation av databasmodellen.
-* `/_archive` - Gammal kod (FastAPI backend, migreringsscript) som inte längre används.
+Netlify → `dashboard.skylandai.se`

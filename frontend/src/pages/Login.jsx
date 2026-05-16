@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Anchor, RefreshCw } from 'lucide-react';
+import { RefreshCw, Mail } from 'lucide-react';
 
 export const Login = () => {
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [sent, setSent] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
 
@@ -19,29 +19,52 @@ export const Login = () => {
         setLoading(true);
         setError(null);
 
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        const { error } = await supabase.auth.signInWithOtp({ email });
 
         if (error) {
-            console.error('Inloggningsfel:', error.message);
+            console.error('Login error:', error.message);
             setError(error.message);
             setLoading(false);
         } else {
-            navigate('/');
+            setSent(true);
+            setLoading(false);
         }
     };
 
+    if (sent) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background p-4">
+                <Card className="w-full max-w-sm shadow-lg border-border/50">
+                    <CardHeader className="text-center pb-2">
+                        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
+                            <Mail className="h-6 w-6 text-primary" />
+                        </div>
+                        <CardTitle className="text-xl">Kolla din inbox</CardTitle>
+                        <CardDescription className="text-sm">
+                            En inloggningslänk har skickats till <strong>{email}</strong>
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                        <button
+                            onClick={() => { setSent(false); setEmail(''); }}
+                            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            Ändra emailadress
+                        </button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-background to-blue-50 dark:from-blue-950/20 dark:via-background dark:to-blue-950/20 p-4">
-            <Card className="w-full max-w-sm sm:max-w-md shadow-lg">
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+            <Card className="w-full max-w-sm shadow-lg border-border/50">
                 <CardHeader className="text-center pb-2">
-                    <div className="mx-auto w-12 h-12 sm:w-14 sm:h-14 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-                        <Anchor className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
-                    </div>
-                    <CardTitle className="text-xl sm:text-2xl">Marinmekaniker CRM</CardTitle>
-                    <CardDescription className="text-sm">Logga in för att fortsätta</CardDescription>
+                    <CardTitle className="text-xl tracking-tight">Skyland Dashboard</CardTitle>
+                    <CardDescription className="text-sm">
+                        Logga in med din email
+                    </CardDescription>
                 </CardHeader>
                 <form onSubmit={handleLogin}>
                     <CardContent className="space-y-4">
@@ -50,24 +73,12 @@ export const Login = () => {
                             <Input
                                 id="email"
                                 type="email"
-                                placeholder="namn@exempel.se"
+                                placeholder="joakim@skylandai.se"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                                 className="h-11 sm:h-10"
                                 autoComplete="email"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="password" className="text-sm">Lösenord</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                className="h-11 sm:h-10"
-                                autoComplete="current-password"
                             />
                         </div>
                         {error && (
@@ -85,10 +96,10 @@ export const Login = () => {
                             {loading ? (
                                 <>
                                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                                    Loggar in...
+                                    Skickar...
                                 </>
                             ) : (
-                                'Logga in'
+                                'Skicka inloggningslänk'
                             )}
                         </Button>
                     </CardFooter>

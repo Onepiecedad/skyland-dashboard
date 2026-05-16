@@ -1,428 +1,348 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { leadsAPI } from '../lib/api';
-import { formatCustomerName } from '../lib/formatName';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { Skeleton } from '../components/ui/skeleton';
-import { StatusBadge } from '../components/StatusBadge';
-import { Button } from '../components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Dialog, DialogContent, DialogClose } from '../components/ui/dialog';
-import { LeadCard } from '../components/LeadCard';
-import { LeadForm } from '../components/forms/LeadForm';
-import { DeleteConfirmDialog } from '../components/DeleteConfirmDialog';
-import { ConvertLeadToJobButton } from '../components/ConvertLeadToJobButton';
-import { usePullToRefresh, PullToRefreshIndicator } from '../components/PullToRefresh';
-import { Users, TrendingUp, Clock, CheckCircle, Plus, Edit, Trash2, Mail, Phone, User, Wrench, Archive } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Button } from '../components/ui/button';
+import { LogOut, Users, Clock, TrendingUp, ChevronDown, ChevronUp, Building2, Mail, Zap } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
 
-export function LeadsPage() {
-  const [selectedLead, setSelectedLead] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalError, setModalError] = useState(null);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [leads, setLeads] = useState([]);
-  const [customers, setCustomers] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('updated_at desc');
+const STATUS_CONFIG = {
+    ny:         { label: 'Ny',         color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+    kontaktad:  { label: 'Kontaktad',  color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
+    bokad:      { label: 'Bokad',      color: 'bg-green-500/10 text-green-400 border-green-500/20' },
+    förlorad:   { label: 'Förlorad',   color: 'bg-red-500/10 text-red-400 border-red-500/20' },
+    arkiverad:  { label: 'Arkiverad',  color: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
+};
 
-  const fetchLeads = async () => {
-    try {
-      setLoading(true);
-      const params = {
-        status: statusFilter === 'all' ? undefined : statusFilter,
-        sort: sortBy,
-        limit: 100
-      };
-
-      const response = await leadsAPI.getAll(params);
-      setLeads(response.data || []);
-
-      // Fetch customer names for all unique customer_ids
-      const customerIds = [...new Set((response.data || []).map(l => l.customer_id).filter(Boolean))];
-      if (customerIds.length > 0) {
-        const { data: customersData } = await supabase
-          .from('customers')
-          .select('id, name, email, phone')
-          .in('id', customerIds);
-
-        const customersMap = {};
-        (customersData || []).forEach(c => {
-          customersMap[c.id] = c;
-        });
-        setCustomers(customersMap);
-      }
-    } catch (error) {
-      console.error('Error fetching leads:', error);
-      toast.error('Kunde inte hämta förfrågningar');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchLeads();
-  }, [statusFilter, sortBy]);
-
-  // Pull-to-refresh
-  const { pullDistance, isRefreshing, handlers } = usePullToRefresh({
-    onRefresh: fetchLeads,
-    threshold: 80
-  });
-
-  const openLeadModal = async (leadId) => {
-    setModalOpen(true);
-    setModalLoading(true);
-    setModalError(null);
-    try {
-      const response = await leadsAPI.getAll({ lead_id: leadId });
-      const found = response.data.find(l => l.lead_id === leadId);
-      setSelectedLead(found || null);
-      if (!found) setModalError("Förfrågan hittades inte");
-    } catch (err) {
-      setModalError("Kunde inte ladda förfrågan");
-      setSelectedLead(null);
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
-  const closeLeadModal = () => {
-    setModalOpen(false);
-    setSelectedLead(null);
-    setModalError(null);
-  };
-
-  const handleLeadSuccess = () => {
-    fetchLeads();
-  };
-
-  const handleDeleteLead = async (leadId) => {
-    try {
-      await leadsAPI.delete(leadId);
-      toast.success('Förfrågan borttagen');
-      fetchLeads();
-    } catch (error) {
-      console.error('Error deleting lead:', error);
-      throw error;
-    }
-  };
-
-  const handleQuickStatusChange = async (e, leadId, newStatus) => {
-    e.stopPropagation();
-    try {
-      await leadsAPI.update(leadId, { status: newStatus });
-      const statusLabels = {
-        qualified: 'kvalificerad',
-        won: 'vunnen',
-        lost: 'förlorad'
-      };
-      toast.success(`Förfrågan markerad som ${statusLabels[newStatus] || newStatus}`);
-      fetchLeads();
-    } catch (error) {
-      console.error('Error updating lead status:', error);
-      toast.error('Kunde inte uppdatera status');
-    }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    try {
-      return format(new Date(dateString), 'd MMM yyyy', { locale: sv });
-    } catch {
-      return '-';
-    }
-  };
-
-  const getCustomerDisplayName = (customerId) => {
-    const customer = customers[customerId];
-    if (!customer) return null;
-    return formatCustomerName(customer.name) || customer.email || 'Okänd kund';
-  };
-
-  const getStatusLabel = (status) => {
-    const labels = {
-      new: 'Ny',
-      open: 'Öppen',
-      pending: 'Väntar',
-      qualified: 'Kvalificerad',
-      proposal: 'Offert skickad',
-      won: 'Vunnen',
-      lost: 'Förlorad',
-      on_hold: 'Pausad',
-      archived: 'Arkiverad'
-    };
-    return labels[status] || status;
-  };
-
-  // Calculate stats
-  const stats = {
-    total: leads.length,
-    open: leads.filter(lead => ['open', 'new', 'pending'].includes(lead.status)).length,
-    archived: leads.filter(lead => lead.status === 'archived').length,
-    won: leads.filter(lead => lead.status === 'won').length
-  };
-
-  if (loading) {
+function StatusBadge({ status }) {
+    const config = STATUS_CONFIG[status] || STATUS_CONFIG['ny'];
     return (
-      <div className="space-y-4 p-4" {...handlers}>
-        <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <Skeleton className="h-8 w-40 mb-2" />
-            <Skeleton className="h-4 w-52" />
-          </div>
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-20" />
-          ))}
-        </div>
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-      </div>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${config.color}`}>
+            {config.label}
+        </span>
     );
-  }
+}
 
-  return (
-    <div className="space-y-4 p-4" {...handlers}>
-      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+function ScoreBadge({ score }) {
+    if (score == null) return null;
+    const color = score >= 30 ? 'text-green-400' : score >= 20 ? 'text-yellow-400' : 'text-zinc-400';
+    return (
+        <span className={`flex items-center gap-1 text-xs font-medium ${color}`}>
+            <Zap className="h-3 w-3" />
+            {score}
+        </span>
+    );
+}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Förfrågningar</h1>
-          <p className="text-sm text-muted-foreground">Hantera inkommande förfrågningar och offertförslag</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <LeadForm onSuccess={handleLeadSuccess}>
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Ny förfrågan</span>
-              <span className="sm:hidden">Ny</span>
-            </Button>
-          </LeadForm>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {leads.length} st
-          </span>
-        </div>
-      </div>
+function RelativeTime({ date }) {
+    if (!date) return null;
+    const formatted = formatDistanceToNow(new Date(date), { addSuffix: true, locale: sv });
+    return (
+        <time
+            dateTime={date}
+            title={new Date(date).toLocaleString('sv-SE')}
+            className="text-xs text-zinc-500"
+        >
+            {formatted}
+        </time>
+    );
+}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Totalt</p>
-                <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
-              </div>
-              <Users className="h-5 w-5 text-muted-foreground hidden sm:block" />
-            </div>
-          </CardContent>
-        </Card>
+export function LeadsPage() {
+    const [leads, setLeads] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [statusFilter, setStatusFilter] = useState('alla');
+    const [expandedId, setExpandedId] = useState(null);
 
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Aktiva</p>
-                <p className="text-xl sm:text-2xl font-bold text-orange-600">{stats.open}</p>
-              </div>
-              <Clock className="h-5 w-5 text-muted-foreground hidden sm:block" />
-            </div>
-          </CardContent>
-        </Card>
+    const fetchLeads = async () => {
+        try {
+            let query = supabase
+                .from('prospects')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Arkiverade</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-500">{stats.archived}</p>
-              </div>
-              <TrendingUp className="h-5 w-5 text-muted-foreground hidden sm:block" />
-            </div>
-          </CardContent>
-        </Card>
+            if (statusFilter !== 'alla') {
+                query = query.eq('status', statusFilter);
+            }
 
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Vunna</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.won}</p>
-              </div>
-              <CheckCircle className="h-5 w-5 text-muted-foreground hidden sm:block" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            const { data: prospects, error: pErr } = await query;
+            if (pErr) throw pErr;
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px] h-9 text-sm">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alla status</SelectItem>
-            <SelectItem value="new">Ny</SelectItem>
-            <SelectItem value="open">Öppen</SelectItem>
-            <SelectItem value="pending">Väntar</SelectItem>
-            <SelectItem value="won">Vunnen</SelectItem>
-            <SelectItem value="lost">Förlorad</SelectItem>
-            <SelectItem value="archived">Arkiverad</SelectItem>
-          </SelectContent>
-        </Select>
+            // Fetch AI responses from interactions
+            const sessionUuids = (prospects || []).map(p => p.session_uuid).filter(Boolean);
+            let interactionsMap = {};
 
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-[150px] h-9 text-sm">
-            <SelectValue placeholder="Sortering" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="updated_at desc">Senast uppdaterad</SelectItem>
-            <SelectItem value="created_at desc">Senast skapad</SelectItem>
-            <SelectItem value="created_at asc">Äldst först</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+            if (sessionUuids.length > 0) {
+                const { data: interactions } = await supabase
+                    .from('interactions')
+                    .select('session_uuid, payload')
+                    .eq('type', 'form')
+                    .in('session_uuid', sessionUuids);
 
-      {/* Lead List */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <div className="space-y-3">
-          {leads.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="font-medium">Inga förfrågningar</p>
-                <p className="text-sm">Det finns inga förfrågningar som matchar dina filter</p>
-              </CardContent>
-            </Card>
-          ) : (
-            leads.map((lead) => {
-              const customerName = getCustomerDisplayName(lead.customer_id);
-              const customer = customers[lead.customer_id];
+                (interactions || []).forEach(i => {
+                    interactionsMap[i.session_uuid] = i.payload;
+                });
+            }
 
-              return (
-                <Card
-                  key={lead.lead_id}
-                  className="hover:bg-muted/30 transition-colors cursor-pointer active:bg-muted/50"
-                  onClick={() => openLeadModal(lead.lead_id)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex flex-col gap-3">
-                      {/* Header row */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-sm sm:text-base line-clamp-2">
-                            {lead.summary || lead.name || 'Namnlös förfrågan'}
-                          </h3>
-                          {lead.description && (
-                            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mt-1">
-                              {lead.description}
-                            </p>
-                          )}
-                        </div>
-                        <StatusBadge status={lead.status} type="lead" />
-                      </div>
+            // Combine
+            const combined = (prospects || []).map(p => ({
+                ...p,
+                ai_response: interactionsMap[p.session_uuid]?.ai_response || null,
+                similarity: interactionsMap[p.session_uuid]?.best_match_similarity || null,
+            }));
 
-                      {/* Customer info */}
-                      {(customerName || customer) && (
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <User className="h-3.5 w-3.5" />
-                            <span className="truncate max-w-[150px] sm:max-w-none">{customerName}</span>
-                          </div>
-                          {customer?.phone && (
-                            <div className="flex items-center gap-1.5 text-muted-foreground hidden sm:flex">
-                              <Phone className="h-3.5 w-3.5" />
-                              <span>{customer.phone}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+            setLeads(combined);
+        } catch (error) {
+            console.error('Error fetching leads:', error);
+            toast.error('Kunde inte hämta leads');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-                      {/* Footer with date and actions */}
-                      <div className="flex items-center justify-between gap-2 pt-1" onClick={e => e.stopPropagation()}>
-                        <span className="text-xs text-muted-foreground">
-                          Skapad {formatDate(lead.created_at)}
-                        </span>
+    useEffect(() => {
+        fetchLeads();
+    }, [statusFilter]);
 
-                        <div className="flex items-center gap-1">
-                          {/* Convert to Job button - main action */}
-                          {lead.status !== 'won' && lead.status !== 'lost' && lead.status !== 'archived' && lead.customer_id && (
-                            <ConvertLeadToJobButton
-                              lead={lead}
-                              onSuccess={handleLeadSuccess}
-                              variant="default"
-                              size="sm"
-                              className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700"
-                            />
-                          )}
+    // Realtime subscription
+    useEffect(() => {
+        const channel = supabase
+            .channel('prospects-realtime')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'prospects' },
+                (payload) => {
+                    toast.info(`Ny lead: ${payload.new.name || 'Okänd'}`);
+                    fetchLeads();
+                }
+            )
+            .subscribe();
 
-                          {/* Archive button for leads that go nowhere */}
-                          {lead.status !== 'won' && lead.status !== 'lost' && lead.status !== 'archived' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => handleQuickStatusChange(e, lead.lead_id, 'archived')}
-                              className="h-7 px-2 text-xs"
-                              title="Arkivera"
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
+
+    const handleStatusChange = async (id, newStatus) => {
+        try {
+            const { error } = await supabase
+                .from('prospects')
+                .update({ status: newStatus })
+                .eq('id', id);
+
+            if (error) throw error;
+            toast.success(`Status ändrad till ${STATUS_CONFIG[newStatus]?.label || newStatus}`);
+            fetchLeads();
+        } catch (error) {
+            console.error('Error updating status:', error);
+            toast.error('Kunde inte uppdatera status');
+        }
+    };
+
+    const location = useLocation();
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        window.location.href = '/login';
+    };
+
+    // Stats
+    const stats = {
+        total: leads.length,
+        nya: leads.filter(l => l.status === 'ny' || !l.status).length,
+        kontaktade: leads.filter(l => l.status === 'kontaktad').length,
+        bokade: leads.filter(l => l.status === 'bokad').length,
+    };
+
+    return (
+        <div className="min-h-screen bg-background">
+            {/* Top bar */}
+            <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+                <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-14">
+                    <div className="flex items-center gap-6">
+                        <span className="text-base font-semibold tracking-tight">Skyland Dashboard</span>
+                        <nav className="flex items-center gap-4">
+                            <Link
+                                to="/leads"
+                                className={`text-sm transition-colors ${location.pathname === '/leads' ? 'text-foreground' : 'text-zinc-500 hover:text-zinc-300'}`}
                             >
-                              <Archive className="h-3 w-3 sm:mr-1" />
-                              <span className="hidden sm:inline">Arkivera</span>
-                            </Button>
-                          )}
-
-                          <LeadForm lead={lead} onSuccess={handleLeadSuccess}>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                          </LeadForm>
-
-                          <DeleteConfirmDialog
-                            title="Ta bort förfrågan"
-                            description={`Är du säker på att du vill ta bort "${lead.summary || lead.name || 'denna förfrågan'}"? Detta kan inte ångras.`}
-                            onConfirm={() => handleDeleteLead(lead.lead_id)}
-                          >
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </DeleteConfirmDialog>
-                        </div>
-                      </div>
+                                Leads
+                            </Link>
+                            <Link
+                                to="/engagements"
+                                className={`text-sm transition-colors ${location.pathname === '/engagements' ? 'text-foreground' : 'text-zinc-500 hover:text-zinc-300'}`}
+                            >
+                                Engagements
+                            </Link>
+                        </nav>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </div>
+                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-400 hover:text-zinc-200">
+                        <LogOut className="h-4 w-4" />
+                    </Button>
+                </div>
+            </header>
 
-        <DialogContent className="w-[95vw] max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6">
-          {modalLoading ? (
-            <LoadingSpinner />
-          ) : modalError ? (
-            <div className="text-destructive p-4">{modalError}</div>
-          ) : (
-            <LeadCard lead={selectedLead} onSuccess={() => { closeLeadModal(); fetchLeads(); }} />
-          )}
-          <DialogClose asChild>
-            <Button variant="outline" className="w-full mt-4" onClick={closeLeadModal}>Stäng</Button>
-          </DialogClose>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+            <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-3">
+                    <Card className="border-border/50 bg-card/50">
+                        <CardContent className="p-4">
+                            <p className="text-xs text-zinc-500">Nya</p>
+                            <p className="text-2xl font-bold text-blue-400">{stats.nya}</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-border/50 bg-card/50">
+                        <CardContent className="p-4">
+                            <p className="text-xs text-zinc-500">Kontaktade</p>
+                            <p className="text-2xl font-bold text-yellow-400">{stats.kontaktade}</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-border/50 bg-card/50">
+                        <CardContent className="p-4">
+                            <p className="text-xs text-zinc-500">Bokade</p>
+                            <p className="text-2xl font-bold text-green-400">{stats.bokade}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Filter */}
+                <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-medium text-zinc-400">
+                        Leads <span className="text-zinc-600">({leads.length})</span>
+                    </h2>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[140px] h-8 text-xs border-border/50 bg-card/50">
+                            <SelectValue placeholder="Filter" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="alla">Alla</SelectItem>
+                            <SelectItem value="ny">Nya</SelectItem>
+                            <SelectItem value="kontaktad">Kontaktade</SelectItem>
+                            <SelectItem value="bokad">Bokade</SelectItem>
+                            <SelectItem value="förlorad">Förlorade</SelectItem>
+                            <SelectItem value="arkiverad">Arkiverade</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Lead list */}
+                {loading ? (
+                    <div className="space-y-3">
+                        {[...Array(4)].map((_, i) => (
+                            <div key={i} className="h-24 rounded-lg bg-card/30 animate-pulse" />
+                        ))}
+                    </div>
+                ) : leads.length === 0 ? (
+                    <Card className="border-border/50">
+                        <CardContent className="p-12 text-center">
+                            <Mail className="h-10 w-10 mx-auto mb-3 text-zinc-600" />
+                            <p className="text-sm text-zinc-400">Inga leads matchar filtret</p>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="space-y-2">
+                        {leads.map((lead) => {
+                            const isExpanded = expandedId === lead.id;
+
+                            return (
+                                <Card
+                                    key={lead.id}
+                                    className="border-border/50 bg-card/50 hover:bg-card/80 transition-colors cursor-pointer"
+                                    onClick={() => setExpandedId(isExpanded ? null : lead.id)}
+                                >
+                                    <CardContent className="p-4">
+                                        {/* Compact view */}
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-medium text-sm truncate">
+                                                        {lead.name || 'Okänd'}
+                                                    </span>
+                                                    <ScoreBadge score={lead.score} />
+                                                </div>
+                                                <div className="flex items-center gap-3 text-xs text-zinc-500">
+                                                    {lead.company && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Building2 className="h-3 w-3" />
+                                                            {lead.company}
+                                                        </span>
+                                                    )}
+                                                    <RelativeTime date={lead.created_at} />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <StatusBadge status={lead.status || 'ny'} />
+                                                {isExpanded
+                                                    ? <ChevronUp className="h-4 w-4 text-zinc-600" />
+                                                    : <ChevronDown className="h-4 w-4 text-zinc-600" />
+                                                }
+                                            </div>
+                                        </div>
+
+                                        {/* Expanded view */}
+                                        {isExpanded && (
+                                            <div className="mt-4 pt-4 border-t border-border/50 space-y-4" onClick={e => e.stopPropagation()}>
+                                                {/* Contact info */}
+                                                <div className="flex flex-wrap gap-4 text-sm">
+                                                    {lead.email && (
+                                                        <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition-colors">
+                                                            <Mail className="h-3.5 w-3.5" />
+                                                            {lead.email}
+                                                        </a>
+                                                    )}
+                                                </div>
+
+                                                {/* Message */}
+                                                {lead.message && (
+                                                    <div>
+                                                        <p className="text-xs font-medium text-zinc-500 mb-1">Meddelande</p>
+                                                        <p className="text-sm text-zinc-300 leading-relaxed">{lead.message}</p>
+                                                    </div>
+                                                )}
+
+                                                {/* AI Response */}
+                                                {lead.ai_response && (
+                                                    <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg p-3">
+                                                        <p className="text-xs font-medium text-blue-400 mb-1">AI-svar</p>
+                                                        <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">
+                                                            {lead.ai_response}
+                                                        </p>
+                                                        {lead.similarity != null && (
+                                                            <p className="text-xs text-zinc-600 mt-2">
+                                                                Matchning: {(lead.similarity * 100).toFixed(0)}%
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Status actions */}
+                                                <div className="flex flex-wrap gap-2">
+                                                    {Object.entries(STATUS_CONFIG).map(([key, conf]) => (
+                                                        <Button
+                                                            key={key}
+                                                            variant={lead.status === key ? 'default' : 'outline'}
+                                                            size="sm"
+                                                            className="h-7 text-xs"
+                                                            onClick={() => handleStatusChange(lead.id, key)}
+                                                            disabled={lead.status === key}
+                                                        >
+                                                            {conf.label}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
+            </main>
+        </div>
+    );
 }
