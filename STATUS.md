@@ -1,13 +1,13 @@
 # Skyland Dashboard — Status
 
-**Senast uppdaterad:** 2026-05-16  
-**Version:** v0 — komplett lokalt
+**Senast uppdaterad:** 2026-05-17  
+**Version:** v0 — live på dashboard.skylandai.se
 
 ---
 
 ## Vad som är klart (v0)
 
-- **Auth** — Magic link via email (Supabase Auth). Fungerar lokalt.
+- **Auth** — Magic link via email (Supabase Auth). Fungerar i produktion.
 - **LeadsPage** — Visar prospects från Supabase i realtid. Status-hantering, score-badges, AI-svar expanderbara. Realtime-subscription på nya leads.
 - **EngagementsPage** — Visar klient-projekt (5 seeded: Hasselblads Livs, MarinMekaniker, Björn Olsson, Cold Experience, Tankrengöring.se).
 - **Navigation** — Leads ↔ Engagements i gemensam navbar.
@@ -15,12 +15,18 @@
 
 ---
 
+## Deploy
+
+- **Netlify** — `skyland-dashboard` → `dashboard.skylandai.se` ✅
+- **DNS** — CNAME i one.com: `dashboard` → `skyland-dashboard.netlify.app` ✅
+- **Supabase Auth** — Site URL + Redirect URLs satta till `https://dashboard.skylandai.se` ✅
+- **SSL** — Let's Encrypt via Netlify ✅
+
+---
+
 ## Vad som återstår
 
-1. **Netlify-deploy** — Bygg och deploya till `dashboard.skylandai.se`
-2. **DNS** — Koppla `dashboard.skylandai.se` i Netlify + domänregistraren
-3. **GDPR privacy policy-sida** — Länkas från consent-checkbox i void-formuläret (skylandai.se, inte dashboarden)
-4. **Produktions-URL i Supabase** — Lägg till `https://dashboard.skylandai.se` i Authentication → URL Configuration → Redirect URLs
+1. **GDPR privacy policy-sida** — Länkas från consent-checkbox i void-formuläret (skylandai.se, inte dashboarden)
 
 ---
 
@@ -53,4 +59,4 @@ DISABLE_ESLINT_PLUGIN=true
 - React 19 + CRACO + Tailwind CSS + Radix UI
 - Supabase Auth (magic link) + Realtime + PostgreSQL
 - TanStack React Query, Sonner toasts, date-fns/sv, Lucide icons
-- Deploy target: Netlify
+- Deployed: Netlify → dashboard.skylandai.se
