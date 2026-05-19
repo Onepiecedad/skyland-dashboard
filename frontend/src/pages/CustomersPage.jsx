@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Dialog, DialogContent } from '../components/ui/dialog';
 import { LogOut, Search, Building2, ChevronRight, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { CustomerDetailPanel } from './CustomerDetailPanel';
 
 const STATUS_COLORS = {
     'i drift':   'bg-green-500/10 text-green-400 border-green-500/20',
@@ -34,8 +36,8 @@ export function CustomersPage() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState('alla');
+    const [modalCustomerId, setModalCustomerId] = useState(null);
     const location = useLocation();
-    const navigate = useNavigate();
 
     const fetchCustomers = async () => {
         try {
@@ -167,7 +169,7 @@ export function CustomersPage() {
                                 <Card
                                     key={customer.id}
                                     className="border-border/50 bg-card/50 hover:bg-card/80 transition-colors cursor-pointer"
-                                    onClick={() => navigate(`/customers/${customer.id}`)}
+                                    onClick={() => setModalCustomerId(customer.id)}
                                 >
                                     <CardContent className="p-4">
                                         <div className="flex items-center justify-between gap-3">
@@ -207,6 +209,21 @@ export function CustomersPage() {
                     </div>
                 )}
             </main>
+
+            {/* ── Customer detail modal ── */}
+            <Dialog open={!!modalCustomerId} onOpenChange={open => !open && setModalCustomerId(null)}>
+                <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0 border-border/60 shadow-[0_0_80px_rgba(8,146,90,0.15),0_0_160px_rgba(8,146,90,0.06),0_16px_64px_rgba(0,0,0,0.6)]">
+                    <div className="overflow-y-auto flex-1 px-6 pb-6 pt-6">
+                        {modalCustomerId && (
+                            <CustomerDetailPanel
+                                customerId={modalCustomerId}
+                                showBackButton={false}
+                                onDeleted={() => setModalCustomerId(null)}
+                            />
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
