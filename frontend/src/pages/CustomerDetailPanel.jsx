@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -13,6 +12,8 @@ import {
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
+import { customerDetailAPI } from '../lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -37,8 +38,10 @@ const ACTIVITY_LABELS = {
     'customer_created':       'Kund skapad',
     'customer_updated':       'Kund uppdaterad',
     'company_created':        'Företag skapat',
+    'company_deleted':        'Företag raderat',
     'company_updated':        'Företag uppdaterat',
     'project_created':        'Projekt skapat',
+    'project_deleted':        'Projekt raderat',
     'project_status_changed': 'Projektstatus ändrad',
     'notes_updated':          'Anteckningar uppdaterade',
 };
@@ -135,13 +138,7 @@ function InlineTextarea({ value, onSave, placeholder = 'Klicka för att lägga t
 export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = true }) {
     const navigate = useNavigate();
     const id = customerId;
-
-    const [customer, setCustomer] = useState(null);
-    const [companies, setCompanies] = useState([]);
-    const [prospects, setProspects] = useState([]);
-    const [activityLog, setActivityLog] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
+    const queryClient = useQueryClient();
 
     const [expandedProjectId, setExpandedProjectId] = useState(null);
     const [expandedProspectId, setExpandedProspectId] = useState(null);
@@ -154,93 +151,87 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
     const [addProjectForm, setAddProjectForm] = useState({ name: '', company_id: '', project_type: 'konsultation', status: 'lead', next_step: '' });
     const [savingProject, setSavingProject] = useState(false);
 
+    const detailQuery = useQuery({
+        queryKey: ['customer-detail', id],
+        queryFn: () => customerDetailAPI.fetchCustomerDetail(id),
+        enabled: !!id,
+    });
+
+    const customer = detailQuery.data?.customer || null;
+    const companies = detailQuery.data?.companies || [];
+    const prospects = detailQuery.data?.prospects || [];
+    const activityLog = detailQuery.data?.activityLog || [];
+    const loading = detailQuery.isLoading;
+    const error = detailQuery.isError;
+
+    const invalidateDetail = () => queryClient.invalidateQueries({ queryKey: ['customer-detail', id] });
+
     const logActivity = useCallback(async (action, description, opts = {}) => {
         try {
-            await supabase.from('activity_log').insert({
-                action,
-                description,
-                customer_id: id,
-                company_id: opts.company_id || null,
-                project_id: opts.project_id || null,
-                actor: 'user',
-                metadata: opts.metadata || {},
-            });
+            await customerDetailAPI.insertActivityLog(id, action, description, opts);
         } catch {
             // non-critical
         }
     }, [id]);
 
-    const fetchData = useCallback(async () => {
-        setLoading(true);
-        setError(false);
-        try {
-            const [custRes, compsRes, prspRes, actRes] = await Promise.all([
-                supabase.from('customers').select('*').eq('id', id).single(),
-                supabase.from('companies').select('*, projects (*)').eq('customer_id', id).order('created_at', { ascending: true }),
-                supabase.from('prospects').select('id, name, email, company, message, score, status, created_at').eq('customer_id', id).order('created_at', { ascending: false }),
-                supabase.from('activity_log').select('*').eq('customer_id', id).order('created_at', { ascending: false }).limit(50),
-            ]);
+    const updateCustomerMutation = useMutation({
+        mutationFn: ({ field, value }) => customerDetailAPI.updateCustomerField(id, field, value),
+        onSuccess: async (_data, variables) => {
+            await logActivity('customer_updated', `${variables.field} uppdaterat`);
+            invalidateDetail();
+            toast.success('Sparat');
+        },
+    });
 
-            if (custRes.error) throw custRes.error;
-            setCustomer(custRes.data);
-            setCompanies(compsRes.data || []);
-            setProspects(prspRes.data || []);
-            setActivityLog(actRes.data || []);
-        } catch (err) {
-            console.error(err);
-            setError(true);
-        } finally {
-            setLoading(false);
-        }
-    }, [id]);
+    const updateCompanyMutation = useMutation({
+        mutationFn: ({ companyId, field, value }) => customerDetailAPI.updateCompanyField(companyId, field, value),
+        onSuccess: async (_data, variables) => {
+            await logActivity('company_updated', `${variables.field} uppdaterat`, { company_id: variables.companyId });
+            invalidateDetail();
+            toast.success('Sparat');
+        },
+    });
 
-    useEffect(() => { fetchData(); }, [fetchData]);
+    const updateProjectMutation = useMutation({
+        mutationFn: ({ projectId, field, value }) => customerDetailAPI.updateProjectField(projectId, field, value),
+        onSuccess: async (_data, variables) => {
+            if (variables.field === 'status') {
+                await logActivity('project_status_changed', `Status → ${variables.value}`, {
+                    company_id: variables.companyId,
+                    project_id: variables.projectId,
+                });
+            }
+            invalidateDetail();
+            toast.success('Sparat');
+        },
+    });
 
     const saveCustomerField = async (field, value) => {
-        const { error } = await supabase.from('customers').update({ [field]: value }).eq('id', id);
-        if (error) throw error;
-        setCustomer(prev => ({ ...prev, [field]: value }));
-        await logActivity('customer_updated', `${field} uppdaterat`);
-        toast.success('Sparat');
+        await updateCustomerMutation.mutateAsync({ field, value });
     };
 
     const saveCompanyField = async (companyId, field, value) => {
-        const { error } = await supabase.from('companies').update({ [field]: value }).eq('id', companyId);
-        if (error) throw error;
-        setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, [field]: value } : c));
-        await logActivity('company_updated', `${field} uppdaterat`, { company_id: companyId });
-        toast.success('Sparat');
+        await updateCompanyMutation.mutateAsync({ companyId, field, value });
     };
 
     const saveProjectField = async (projectId, companyId, field, value) => {
-        const { error } = await supabase.from('projects').update({ [field]: value }).eq('id', projectId);
-        if (error) { toast.error('Kunde inte spara'); return; }
-        setCompanies(prev => prev.map(co =>
-            co.id === companyId
-                ? { ...co, projects: (co.projects || []).map(p => p.id === projectId ? { ...p, [field]: value } : p) }
-                : co
-        ));
-        if (field === 'status') {
-            await logActivity('project_status_changed', `Status → ${value}`, { company_id: companyId, project_id: projectId });
+        try {
+            await updateProjectMutation.mutateAsync({ projectId, companyId, field, value });
+        } catch {
+            toast.error('Kunde inte spara');
         }
-        toast.success('Sparat');
     };
 
     const handleAddCompany = async () => {
         if (!addCompanyForm.name.trim()) { toast.error('Namn krävs'); return; }
         setSavingCompany(true);
         try {
-            const { data, error } = await supabase
-                .from('companies')
-                .insert({ customer_id: id, ...addCompanyForm })
-                .select()
-                .single();
-            if (error) throw error;
+            const data = await customerDetailAPI.createCompany(id, addCompanyForm);
             await logActivity('company_created', `${data.name} skapat`, { company_id: data.id });
             toast.success(`${data.name} skapat`);
             setShowAddCompany(false);
             setAddCompanyForm({ name: '', industry: '', website: '', notes: '' });
-            await fetchData();
+            invalidateDetail();
         } catch {
             toast.error('Kunde inte skapa företag');
         } finally {
@@ -253,23 +244,18 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
         if (!addProjectForm.company_id) { toast.error('Välj ett företag'); return; }
         setSavingProject(true);
         try {
-            const { data, error } = await supabase
-                .from('projects')
-                .insert({
-                    company_id: addProjectForm.company_id,
-                    name: addProjectForm.name.trim(),
-                    project_type: addProjectForm.project_type,
-                    status: addProjectForm.status,
-                    next_step: addProjectForm.next_step.trim() || null,
-                })
-                .select()
-                .single();
-            if (error) throw error;
+            const data = await customerDetailAPI.createProject({
+                company_id: addProjectForm.company_id,
+                name: addProjectForm.name.trim(),
+                project_type: addProjectForm.project_type,
+                status: addProjectForm.status,
+                next_step: addProjectForm.next_step.trim() || null,
+            });
             await logActivity('project_created', `${data.name} skapat`, { company_id: addProjectForm.company_id, project_id: data.id });
             toast.success(`${data.name} skapat`);
             setShowAddProject(false);
             setAddProjectForm({ name: '', company_id: '', project_type: 'konsultation', status: 'lead', next_step: '' });
-            await fetchData();
+            invalidateDetail();
         } catch {
             toast.error('Kunde inte skapa projekt');
         } finally {
@@ -280,14 +266,10 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
     const handleDeleteProject = async (projectId, projectName) => {
         if (!window.confirm(`Radera projektet "${projectName}" permanent?`)) return;
         try {
-            const { error } = await supabase.from('projects').delete().eq('id', projectId);
-            if (error) throw error;
+            await customerDetailAPI.deleteProject(projectId);
             await logActivity('project_deleted', `${projectName} raderat`);
             toast.success(`${projectName} raderat`);
-            setCompanies(prev => prev.map(co => ({
-                ...co,
-                projects: (co.projects || []).filter(p => p.id !== projectId),
-            })));
+            invalidateDetail();
             if (expandedProjectId === projectId) setExpandedProjectId(null);
         } catch {
             toast.error('Kunde inte radera projekt');
@@ -297,11 +279,10 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
     const handleDeleteCompany = async (companyId, companyName) => {
         if (!window.confirm(`Radera "${companyName}" och alla tillhörande projekt permanent?`)) return;
         try {
-            const { error } = await supabase.from('companies').delete().eq('id', companyId);
-            if (error) throw error;
+            await customerDetailAPI.deleteCompany(companyId);
             await logActivity('company_deleted', `${companyName} raderat`);
             toast.success(`${companyName} raderat`);
-            setCompanies(prev => prev.filter(co => co.id !== companyId));
+            invalidateDetail();
         } catch {
             toast.error('Kunde inte radera företag');
         }
@@ -310,8 +291,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
     const handleDeleteCustomer = async () => {
         if (!window.confirm(`Radera kunden "${customer.full_name}" och alla företag/projekt permanent? Åtgärden kan inte ångras.`)) return;
         try {
-            const { error } = await supabase.from('customers').delete().eq('id', id);
-            if (error) throw error;
+            await customerDetailAPI.deleteCustomer(id);
             toast.success('Kund raderad');
             if (onDeleted) onDeleted();
             else navigate('/customers');

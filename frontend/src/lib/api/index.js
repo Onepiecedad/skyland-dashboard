@@ -1,8 +1,10 @@
 /**
- * API Module Index — Skyland Dashboard v0
+ * API Module Index — Skyland Dashboard
  *
- * Only exports API modules relevant to the dashboard.
- * Thomas-specific APIs (boats, invoices, jobs, messages etc.) have been removed.
+ * The dashboard currently queries Supabase directly from page components.
+ * Shared modules are introduced only when they remove real duplication.
  */
 
-export { leadsAPI } from './leadsAPI';
+export * as customerDetailAPI from './customerDetail';
+export * as leadsAPI from './leads';
+export * as customersAPI from './customers';

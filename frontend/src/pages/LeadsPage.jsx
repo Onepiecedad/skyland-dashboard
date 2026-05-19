@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { LogOut, Building2, Mail, Phone, Zap, UserPlus, Trash2 } from 'lucide-react';
+import { Building2, Mail, Phone, Zap, UserPlus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
+import { leadsAPI } from '../lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { DashboardShell } from '../components/DashboardShell';
 
 const STATUS_CONFIG = {
     ny:        { label: 'Ny',        color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
@@ -74,8 +77,6 @@ function SourceBadge({ source }) {
 }
 
 export function LeadsPage() {
-    const [leads, setLeads] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('alla');
 
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -86,97 +87,89 @@ export function LeadsPage() {
     const [converting, setConverting] = useState(false);
 
     const navigate = useNavigate();
-    const location = useLocation();
+    const queryClient = useQueryClient();
 
-    const fetchLeads = async () => {
-        try {
-            let query = supabase
-                .from('prospects')
-                .select('*')
-                .order('created_at', { ascending: false });
+    const leadsQuery = useQuery({
+        queryKey: ['leads', statusFilter],
+        queryFn: () => leadsAPI.fetchLeads(statusFilter),
+    });
 
-            if (statusFilter !== 'alla') query = query.eq('status', statusFilter);
-
-            const { data: prospects, error: pErr } = await query;
-            if (pErr) throw pErr;
-
-            const sessionUuids = (prospects || []).map(p => p.session_uuid).filter(Boolean);
-            let interactionsMap = {};
-
-            if (sessionUuids.length > 0) {
-                const { data: interactions } = await supabase
-                    .from('interactions')
-                    .select('session_uuid, payload')
-                    .eq('type', 'form')
-                    .in('session_uuid', sessionUuids);
-
-                (interactions || []).forEach(i => { interactionsMap[i.session_uuid] = i.payload; });
-            }
-
-            setLeads((prospects || []).map(p => ({
-                ...p,
-                ai_response: interactionsMap[p.session_uuid]?.ai_response || null,
-                similarity: interactionsMap[p.session_uuid]?.best_match_similarity || null,
-                source: p.source || interactionsMap[p.session_uuid]?.source || null,
-            })));
-        } catch {
-            toast.error('Kunde inte hämta leads');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => { fetchLeads(); }, [statusFilter]);
+    const leads = leadsQuery.data || [];
+    const loading = leadsQuery.isLoading;
 
     useEffect(() => {
         const channel = supabase
             .channel('prospects-realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'prospects' }, payload => {
                 toast.info(`Ny lead: ${payload.new.name || 'Okänd'}`);
-                fetchLeads();
+                queryClient.invalidateQueries({ queryKey: ['leads'] });
             })
             .subscribe();
         return () => supabase.removeChannel(channel);
-    }, []);
+    }, [queryClient]);
+
+    useEffect(() => {
+        if (leadsQuery.isError) {
+            toast.error('Kunde inte hämta leads');
+        }
+    }, [leadsQuery.isError]);
+
+    const updateStatusMutation = useMutation({
+        mutationFn: ({ id, status }) => leadsAPI.updateLeadStatus(id, status),
+        onSuccess: (_data, variables) => {
+            toast.success(`Status → ${STATUS_CONFIG[variables.status]?.label || variables.status}`);
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
+            setModalLead(prev => prev?.id === variables.id ? { ...prev, status: variables.status } : prev);
+        },
+        onError: () => toast.error('Kunde inte uppdatera status'),
+    });
+
+    const deleteLeadMutation = useMutation({
+        mutationFn: (id) => leadsAPI.deleteLead(id),
+        onSuccess: (_data, id) => {
+            toast.success('Lead raderat');
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
+            setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+            if (modalLead?.id === id) setModalLead(null);
+        },
+        onError: () => toast.error('Kunde inte radera lead'),
+    });
+
+    const deleteLeadsMutation = useMutation({
+        mutationFn: (ids) => leadsAPI.deleteLeads(ids),
+        onSuccess: (_data, ids) => {
+            toast.success(`${ids.length} leads raderade`);
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
+            setSelectedIds(new Set());
+        },
+        onError: () => toast.error('Kunde inte radera leads'),
+    });
+
+    const convertLeadMutation = useMutation({
+        mutationFn: ({ lead, form }) => leadsAPI.convertLeadToCustomer(lead, form, PROJECT_TYPES),
+        onSuccess: ({ customer }) => {
+            toast.success('Kund skapad');
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
+            setConvertingLead(null);
+            navigate(`/customers/${customer.id}`);
+        },
+        onError: () => toast.error('Kunde inte skapa kund'),
+        onSettled: () => setConverting(false),
+    });
 
     const handleStatusChange = async (id, newStatus) => {
-        try {
-            const { error } = await supabase.from('prospects').update({ status: newStatus }).eq('id', id);
-            if (error) throw error;
-            toast.success(`Status → ${STATUS_CONFIG[newStatus]?.label || newStatus}`);
-            setLeads(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
-            setModalLead(prev => prev?.id === id ? { ...prev, status: newStatus } : prev);
-        } catch {
-            toast.error('Kunde inte uppdatera status');
-        }
+        updateStatusMutation.mutate({ id, status: newStatus });
     };
 
     const handleDeleteLead = async (id) => {
         if (!window.confirm('Radera lead permanent?')) return;
-        try {
-            const { error } = await supabase.from('prospects').delete().eq('id', id);
-            if (error) throw error;
-            toast.success('Lead raderat');
-            setLeads(prev => prev.filter(l => l.id !== id));
-            setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
-            if (modalLead?.id === id) setModalLead(null);
-        } catch {
-            toast.error('Kunde inte radera lead');
-        }
+        deleteLeadMutation.mutate(id);
     };
 
     const handleBulkDelete = async () => {
         const ids = [...selectedIds];
         if (!window.confirm(`Radera ${ids.length} leads permanent?`)) return;
-        try {
-            const { error } = await supabase.from('prospects').delete().in('id', ids);
-            if (error) throw error;
-            toast.success(`${ids.length} leads raderade`);
-            setLeads(prev => prev.filter(l => !ids.includes(l.id)));
-            setSelectedIds(new Set());
-        } catch {
-            toast.error('Kunde inte radera leads');
-        }
+        deleteLeadsMutation.mutate(ids);
     };
 
     const toggleSelect = (id) => {
@@ -199,46 +192,7 @@ export function LeadsPage() {
         if (!convertForm.full_name.trim()) { toast.error('Namn krävs'); return; }
         if (!convertForm.company_name.trim()) { toast.error('Företagsnamn krävs'); return; }
         setConverting(true);
-        try {
-            const { data: customer, error: custErr } = await supabase
-                .from('customers')
-                .insert({ full_name: convertForm.full_name.trim(), email: convertingLead.email || null })
-                .select().single();
-            if (custErr) throw custErr;
-
-            const { data: company, error: compErr } = await supabase
-                .from('companies')
-                .insert({ customer_id: customer.id, name: convertForm.company_name.trim(), industry: convertForm.industry || null })
-                .select().single();
-            if (compErr) throw compErr;
-
-            const { data: project, error: projErr } = await supabase
-                .from('projects')
-                .insert({ company_id: company.id, name: PROJECT_TYPES.find(t => t.value === convertForm.project_type)?.label || convertForm.project_type, project_type: convertForm.project_type, status: 'lead' })
-                .select().single();
-            if (projErr) throw projErr;
-
-            await supabase.from('prospects').update({ customer_id: customer.id }).eq('id', convertingLead.id);
-            await supabase.from('activity_log').insert({
-                action: 'customer_created',
-                description: `Konverterad från prospect "${convertingLead.name || convertingLead.email}"`,
-                customer_id: customer.id, company_id: company.id, project_id: project.id,
-                actor: 'user', metadata: { prospect_id: convertingLead.id },
-            });
-
-            toast.success('Kund skapad');
-            setConvertingLead(null);
-            navigate(`/customers/${customer.id}`);
-        } catch {
-            toast.error('Kunde inte skapa kund');
-        } finally {
-            setConverting(false);
-        }
-    };
-
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
-        window.location.href = '/login';
+        convertLeadMutation.mutate({ lead: convertingLead, form: convertForm });
     };
 
     const stats = {
@@ -248,23 +202,7 @@ export function LeadsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background">
-            <header className="border-b border-primary/10 bg-background/80 backdrop-blur-md sticky top-0 z-50">
-                <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-14">
-                    <div className="flex items-center gap-6">
-                        <span className="text-base font-semibold tracking-tight text-primary">Skyland Dashboard</span>
-                        <nav className="flex items-center gap-4">
-                            <Link to="/leads" className={`text-sm font-medium transition-colors ${location.pathname === '/leads' ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}>Leads</Link>
-                            <Link to="/customers" className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/customers') ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}>Kunder</Link>
-                        </nav>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-500 hover:text-zinc-200">
-                        <LogOut className="h-4 w-4" />
-                    </Button>
-                </div>
-            </header>
-
-            <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <DashboardShell contentClassName="max-w-5xl mx-auto px-4 py-6 space-y-6">
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-3">
                     <Card className="border-primary/15 bg-card/30 backdrop-blur-sm shadow-[0_0_30px_rgba(8,146,90,0.06)]"><CardContent className="p-4"><p className="text-xs text-zinc-500 mb-1">Nya</p><p className="text-2xl font-bold text-primary">{stats.nya}</p></CardContent></Card>
@@ -369,7 +307,6 @@ export function LeadsPage() {
                         ))}
                     </div>
                 )}
-            </main>
 
             {/* ── Lead modal ── */}
             <Dialog open={!!modalLead} onOpenChange={open => { if (!open) setModalLead(null); }}>
@@ -524,6 +461,6 @@ export function LeadsPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </DashboardShell>
     );
 }

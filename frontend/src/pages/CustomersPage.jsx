@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent } from '../components/ui/dialog';
-import { LogOut, Search, Building2, ChevronRight, Users } from 'lucide-react';
+import { Search, Building2, ChevronRight, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { CustomerDetailPanel } from './CustomerDetailPanel';
+import { DashboardShell } from '../components/DashboardShell';
+import { customersAPI } from '../lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const STATUS_COLORS = {
     'i drift':   'bg-green-500/10 text-green-400 border-green-500/20',
@@ -32,50 +33,40 @@ function getStatusSummary(companies) {
 }
 
 export function CustomersPage() {
-    const [customers, setCustomers] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState('alla');
     const [modalCustomerId, setModalCustomerId] = useState(null);
-    const location = useLocation();
+    const queryClient = useQueryClient();
 
-    const fetchCustomers = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('customers')
-                .select(`
-                    id, full_name, email, updated_at,
-                    companies (
-                        id, name,
-                        projects (id, status)
-                    )
-                `)
-                .order('updated_at', { ascending: false });
-            if (error) throw error;
-            setCustomers(data || []);
-        } catch {
-            toast.error('Kunde inte hämta kunder');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const customersQuery = useQuery({
+        queryKey: ['customers'],
+        queryFn: customersAPI.fetchCustomers,
+    });
 
-    useEffect(() => { fetchCustomers(); }, []);
+    const customers = customersQuery.data || [];
+    const loading = customersQuery.isLoading;
 
     useEffect(() => {
         const channel = supabase
             .channel('customers-list')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, fetchCustomers)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'companies' }, fetchCustomers)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, fetchCustomers)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+                queryClient.invalidateQueries({ queryKey: ['customers'] });
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'companies' }, () => {
+                queryClient.invalidateQueries({ queryKey: ['customers'] });
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+                queryClient.invalidateQueries({ queryKey: ['customers'] });
+            })
             .subscribe();
         return () => supabase.removeChannel(channel);
-    }, []);
+    }, [queryClient]);
 
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
-        window.location.href = '/login';
-    };
+    useEffect(() => {
+        if (customersQuery.isError) {
+            toast.error('Kunde inte hämta kunder');
+        }
+    }, [customersQuery.isError]);
 
     const filtered = customers.filter(c => {
         if (searchQuery) {
@@ -94,33 +85,7 @@ export function CustomersPage() {
     });
 
     return (
-        <div className="min-h-screen bg-background">
-            <header className="border-b border-primary/10 bg-background/80 backdrop-blur-md sticky top-0 z-50">
-                <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-14">
-                    <div className="flex items-center gap-6">
-                        <span className="text-base font-semibold tracking-tight text-primary">Skyland Dashboard</span>
-                        <nav className="flex items-center gap-4">
-                            <Link
-                                to="/leads"
-                                className={`text-sm font-medium transition-colors ${location.pathname === '/leads' ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}
-                            >
-                                Leads
-                            </Link>
-                            <Link
-                                to="/customers"
-                                className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/customers') ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}
-                            >
-                                Kunder
-                            </Link>
-                        </nav>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-500 hover:text-zinc-200">
-                        <LogOut className="h-4 w-4" />
-                    </Button>
-                </div>
-            </header>
-
-            <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+        <DashboardShell contentClassName="max-w-5xl mx-auto px-4 py-6 space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
@@ -208,7 +173,6 @@ export function CustomersPage() {
                         })}
                     </div>
                 )}
-            </main>
 
             {/* ── Customer detail modal ── */}
             <Dialog open={!!modalCustomerId} onOpenChange={open => !open && setModalCustomerId(null)}>
@@ -224,6 +188,6 @@ export function CustomersPage() {
                     </div>
                 </DialogContent>
             </Dialog>
-        </div>
+        </DashboardShell>
     );
 }

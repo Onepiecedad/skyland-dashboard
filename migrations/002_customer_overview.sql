@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS customers (
     updated_at  timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_customers_full_name ON customers(full_name);
-CREATE INDEX idx_customers_created   ON customers(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_customers_full_name ON customers(full_name);
+CREATE INDEX IF NOT EXISTS idx_customers_created   ON customers(created_at DESC);
 
 -- -----------------------------------------------
 -- 2. COMPANIES
@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS companies (
     updated_at  timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_companies_customer_id ON companies(customer_id);
-CREATE INDEX idx_companies_created     ON companies(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_companies_customer_id ON companies(customer_id);
+CREATE INDEX IF NOT EXISTS idx_companies_created     ON companies(created_at DESC);
 
 -- -----------------------------------------------
 -- 3. PROJECTS
@@ -56,9 +56,9 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_at   timestamptz            DEFAULT now()
 );
 
-CREATE INDEX idx_projects_company_id ON projects(company_id);
-CREATE INDEX idx_projects_status     ON projects(status);
-CREATE INDEX idx_projects_created    ON projects(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_projects_company_id ON projects(company_id);
+CREATE INDEX IF NOT EXISTS idx_projects_status     ON projects(status);
+CREATE INDEX IF NOT EXISTS idx_projects_created    ON projects(created_at DESC);
 
 -- -----------------------------------------------
 -- 4. MODIFY PROSPECTS — länka konverterade prospects till customer
@@ -84,14 +84,17 @@ CREATE INDEX IF NOT EXISTS idx_activity_project  ON activity_log(project_id);
 -- 6. TRIGGERS — auto-uppdatera updated_at
 --    update_updated_at()-funktionen finns sedan 001
 -- -----------------------------------------------
+DROP TRIGGER IF EXISTS customers_updated_at ON customers;
 CREATE TRIGGER customers_updated_at
     BEFORE UPDATE ON customers
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS companies_updated_at ON companies;
 CREATE TRIGGER companies_updated_at
     BEFORE UPDATE ON companies
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS projects_updated_at ON projects;
 CREATE TRIGGER projects_updated_at
     BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -105,38 +108,53 @@ ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects  ENABLE ROW LEVEL SECURITY;
 
 -- customers
+DROP POLICY IF EXISTS "auth_select_customers" ON customers;
 CREATE POLICY "auth_select_customers" ON customers
     FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "auth_insert_customers" ON customers;
 CREATE POLICY "auth_insert_customers" ON customers
     FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "auth_update_customers" ON customers;
 CREATE POLICY "auth_update_customers" ON customers
     FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "auth_delete_customers" ON customers;
 CREATE POLICY "auth_delete_customers" ON customers
     FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "deny_all_anon_customers" ON customers;
 CREATE POLICY "deny_all_anon_customers" ON customers
     FOR ALL TO anon USING (false);
 
 -- companies
+DROP POLICY IF EXISTS "auth_select_companies" ON companies;
 CREATE POLICY "auth_select_companies" ON companies
     FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "auth_insert_companies" ON companies;
 CREATE POLICY "auth_insert_companies" ON companies
     FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "auth_update_companies" ON companies;
 CREATE POLICY "auth_update_companies" ON companies
     FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "auth_delete_companies" ON companies;
 CREATE POLICY "auth_delete_companies" ON companies
     FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "deny_all_anon_companies" ON companies;
 CREATE POLICY "deny_all_anon_companies" ON companies
     FOR ALL TO anon USING (false);
 
 -- projects
+DROP POLICY IF EXISTS "auth_select_projects" ON projects;
 CREATE POLICY "auth_select_projects" ON projects
     FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "auth_insert_projects" ON projects;
 CREATE POLICY "auth_insert_projects" ON projects
     FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "auth_update_projects" ON projects;
 CREATE POLICY "auth_update_projects" ON projects
     FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "auth_delete_projects" ON projects;
 CREATE POLICY "auth_delete_projects" ON projects
     FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "deny_all_anon_projects" ON projects;
 CREATE POLICY "deny_all_anon_projects" ON projects
     FOR ALL TO anon USING (false);
 
@@ -160,29 +178,31 @@ DECLARE
     comp_cold_exp       uuid := gen_random_uuid();
     comp_tankreng       uuid := gen_random_uuid();
 BEGIN
-    -- 4 customers
-    INSERT INTO customers (id, full_name) VALUES
-        (cust_axel,   'Axel'),
-        (cust_thomas, 'Thomas'),
-        (cust_bjorn,  'Björn Olsson'),
-        (cust_gustav, 'Gustav');
+    IF NOT EXISTS (SELECT 1 FROM customers) THEN
+        -- 4 customers
+        INSERT INTO customers (id, full_name) VALUES
+            (cust_axel,   'Axel'),
+            (cust_thomas, 'Thomas'),
+            (cust_bjorn,  'Björn Olsson'),
+            (cust_gustav, 'Gustav');
 
-    -- 5 companies
-    INSERT INTO companies (id, customer_id, name, industry) VALUES
-        (comp_hasselblad,     cust_axel,   'Hasselblads Livs',  'Livsmedel'),
-        (comp_marinmekaniker, cust_thomas, 'MarinMekaniker',    'Marin service'),
-        (comp_bjorn_olsson,   cust_bjorn,  'Björn Olsson',      'Artist'),
-        (comp_cold_exp,       cust_gustav, 'Cold Experience',   'Event/Upplevelser'),
-        (comp_tankreng,       cust_gustav, 'Tankrengöring.se',  'Industriservice');
+        -- 5 companies
+        INSERT INTO companies (id, customer_id, name, industry) VALUES
+            (comp_hasselblad,     cust_axel,   'Hasselblads Livs',  'Livsmedel'),
+            (comp_marinmekaniker, cust_thomas, 'MarinMekaniker',    'Marin service'),
+            (comp_bjorn_olsson,   cust_bjorn,  'Björn Olsson',      'Artist'),
+            (comp_cold_exp,       cust_gustav, 'Cold Experience',   'Event/Upplevelser'),
+            (comp_tankreng,       cust_gustav, 'Tankrengöring.se',  'Industriservice');
 
-    -- 6 projects
-    INSERT INTO projects (company_id, name, project_type, status, next_step) VALUES
-        (comp_hasselblad,     'AI-system',     'ai-system', 'i drift',   NULL),
-        (comp_marinmekaniker, 'AI-system',     'ai-system', 'i drift',   NULL),
-        (comp_bjorn_olsson,   'Hemsida',       'hemsida',   'levererat', NULL),
-        (comp_cold_exp,       'Hemsida fas 1', 'hemsida',   'levererat', NULL),
-        (comp_cold_exp,       'Hemsida fas 2', 'hemsida',   'lead',      'Diskuteras på Öckerö-möte'),
-        (comp_tankreng,       'Hemsida',       'hemsida',   'lead',      'Scope diskuteras på Öckerö-möte');
+        -- 6 projects
+        INSERT INTO projects (company_id, name, project_type, status, next_step) VALUES
+            (comp_hasselblad,     'AI-system',     'ai-system', 'i drift',   NULL),
+            (comp_marinmekaniker, 'AI-system',     'ai-system', 'i drift',   NULL),
+            (comp_bjorn_olsson,   'Hemsida',       'hemsida',   'levererat', NULL),
+            (comp_cold_exp,       'Hemsida fas 1', 'hemsida',   'levererat', NULL),
+            (comp_cold_exp,       'Hemsida fas 2', 'hemsida',   'lead',      'Diskuteras på Öckerö-möte'),
+            (comp_tankreng,       'Hemsida',       'hemsida',   'lead',      'Scope diskuteras på Öckerö-möte');
+    END IF;
 END $$;
 
 -- =============================================================================
