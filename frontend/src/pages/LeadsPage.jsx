@@ -425,7 +425,7 @@ export function LeadsPage() {
                             <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg p-3">
                                 <p className="text-xs font-medium text-blue-400 mb-1.5">AI-svar</p>
                                 {modalLead?.ai_response?.trim() ? (
-                                    <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{modalLead.ai_response.trim()}</p>
+                                    <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{modalLead.ai_response.trim()}</p>
                                 ) : (
                                     <p className="text-sm text-zinc-500 italic">AI-svaret lagrades inte för detta lead.</p>
                                 )}
