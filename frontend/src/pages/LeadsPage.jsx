@@ -67,7 +67,7 @@ function SourceBadge({ source }) {
     const conf = SOURCE_CONFIG[source];
     const label = conf?.label || source;
     return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border bg-zinc-800/60 text-zinc-400 border-zinc-700/50 shrink-0">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border bg-primary/10 text-primary/70 border-primary/20 shrink-0">
             {label}
         </span>
     );
@@ -249,16 +249,16 @@ export function LeadsPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+            <header className="border-b border-primary/10 bg-background/80 backdrop-blur-md sticky top-0 z-50">
                 <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-14">
                     <div className="flex items-center gap-6">
-                        <span className="text-base font-semibold tracking-tight">Skyland Dashboard</span>
+                        <span className="text-base font-semibold tracking-tight text-primary">Skyland Dashboard</span>
                         <nav className="flex items-center gap-4">
-                            <Link to="/leads" className={`text-sm transition-colors ${location.pathname === '/leads' ? 'text-foreground' : 'text-zinc-500 hover:text-zinc-300'}`}>Leads</Link>
-                            <Link to="/customers" className={`text-sm transition-colors ${location.pathname.startsWith('/customers') ? 'text-foreground' : 'text-zinc-500 hover:text-zinc-300'}`}>Kunder</Link>
+                            <Link to="/leads" className={`text-sm font-medium transition-colors ${location.pathname === '/leads' ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}>Leads</Link>
+                            <Link to="/customers" className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/customers') ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}>Kunder</Link>
                         </nav>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-400 hover:text-zinc-200">
+                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-500 hover:text-zinc-200">
                         <LogOut className="h-4 w-4" />
                     </Button>
                 </div>
@@ -267,9 +267,9 @@ export function LeadsPage() {
             <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-3">
-                    <Card className="border-border/50 bg-card/50"><CardContent className="p-4"><p className="text-xs text-zinc-500">Nya</p><p className="text-2xl font-bold text-blue-400">{stats.nya}</p></CardContent></Card>
-                    <Card className="border-border/50 bg-card/50"><CardContent className="p-4"><p className="text-xs text-zinc-500">Kontaktade</p><p className="text-2xl font-bold text-yellow-400">{stats.kontaktade}</p></CardContent></Card>
-                    <Card className="border-border/50 bg-card/50"><CardContent className="p-4"><p className="text-xs text-zinc-500">Bokade</p><p className="text-2xl font-bold text-green-400">{stats.bokade}</p></CardContent></Card>
+                    <Card className="border-primary/15 bg-card/30 backdrop-blur-sm shadow-[0_0_30px_rgba(8,146,90,0.06)]"><CardContent className="p-4"><p className="text-xs text-zinc-500 mb-1">Nya</p><p className="text-2xl font-bold text-primary">{stats.nya}</p></CardContent></Card>
+                    <Card className="border-primary/15 bg-card/30 backdrop-blur-sm shadow-[0_0_30px_rgba(8,146,90,0.06)]"><CardContent className="p-4"><p className="text-xs text-zinc-500 mb-1">Kontaktade</p><p className="text-2xl font-bold text-primary">{stats.kontaktade}</p></CardContent></Card>
+                    <Card className="border-primary/15 bg-card/30 backdrop-blur-sm shadow-[0_0_30px_rgba(8,146,90,0.06)]"><CardContent className="p-4"><p className="text-xs text-zinc-500 mb-1">Bokade</p><p className="text-2xl font-bold text-primary">{stats.bokade}</p></CardContent></Card>
                 </div>
 
                 {/* Filter + select-all + bulk delete */}
@@ -321,7 +321,7 @@ export function LeadsPage() {
                         {leads.map(lead => (
                             <div
                                 key={lead.id}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors ${selectedIds.has(lead.id) ? 'border-zinc-600/60 bg-card/80' : 'border-border/50 bg-card/50 hover:bg-card/80'}`}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all ${selectedIds.has(lead.id) ? 'border-primary/30 bg-primary/5' : 'border-border/40 bg-card/30 backdrop-blur-sm hover:border-border/60 hover:bg-card/50'}`}
                             >
                                 {/* Checkbox */}
                                 <input
@@ -373,7 +373,7 @@ export function LeadsPage() {
 
             {/* ── Lead modal ── */}
             <Dialog open={!!modalLead} onOpenChange={open => { if (!open) setModalLead(null); }}>
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="sm:max-w-lg border-primary/15 shadow-[0_0_60px_rgba(8,146,90,0.15),0_0_120px_rgba(8,146,90,0.06),0_8px_32px_rgba(0,0,0,0.5)]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 pr-6">
                             <span className="truncate">{modalLead?.name || 'Okänd'}</span>
@@ -422,15 +422,15 @@ export function LeadsPage() {
 
                         {/* AI response */}
                         {(modalLead?.ai_response?.trim() || modalLead?.similarity != null) && (
-                            <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg p-3">
-                                <p className="text-xs font-medium text-blue-400 mb-1.5">AI-svar</p>
+                            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                                <p className="text-xs font-medium text-primary mb-1.5">AI-svar</p>
                                 {modalLead?.ai_response?.trim() ? (
                                     <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{modalLead.ai_response.trim()}</p>
                                 ) : (
                                     <p className="text-sm text-zinc-500 italic">AI-svaret lagrades inte för detta lead.</p>
                                 )}
                                 {modalLead.similarity != null && (
-                                    <p className="text-xs text-zinc-500 mt-2 border-t border-blue-900/30 pt-2">Matchning: {(modalLead.similarity * 100).toFixed(0)}%</p>
+                                    <p className="text-xs text-zinc-500 mt-2 border-t border-primary/20 pt-2">Matchning: {(modalLead.similarity * 100).toFixed(0)}%</p>
                                 )}
                             </div>
                         )}

@@ -99,7 +99,10 @@ html {
     }
 
     body {
-        @apply bg-background text-foreground;
+        @apply text-foreground;
+        background-color: hsl(var(--background));
+        /* Subtle atmospheric green glow at top — matches skyland-ai-os.netlify.app */
+        background-image: radial-gradient(ellipse 110% 55% at 50% -5%, rgba(67, 225, 155, 0.07) 0%, transparent 65%);
     }
 }
 

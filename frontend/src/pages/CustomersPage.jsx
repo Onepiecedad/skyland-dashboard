@@ -95,26 +95,26 @@ export function CustomersPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+            <header className="border-b border-primary/10 bg-background/80 backdrop-blur-md sticky top-0 z-50">
                 <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-14">
                     <div className="flex items-center gap-6">
-                        <span className="text-base font-semibold tracking-tight">Skyland Dashboard</span>
+                        <span className="text-base font-semibold tracking-tight text-primary">Skyland Dashboard</span>
                         <nav className="flex items-center gap-4">
                             <Link
                                 to="/leads"
-                                className={`text-sm transition-colors ${location.pathname === '/leads' ? 'text-foreground' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                className={`text-sm font-medium transition-colors ${location.pathname === '/leads' ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}
                             >
                                 Leads
                             </Link>
                             <Link
                                 to="/customers"
-                                className={`text-sm transition-colors ${location.pathname.startsWith('/customers') ? 'text-foreground' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/customers') ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}
                             >
                                 Kunder
                             </Link>
                         </nav>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-400 hover:text-zinc-200">
+                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-500 hover:text-zinc-200">
                         <LogOut className="h-4 w-4" />
                     </Button>
                 </div>
@@ -168,7 +168,7 @@ export function CustomersPage() {
                             return (
                                 <Card
                                     key={customer.id}
-                                    className="border-border/50 bg-card/50 hover:bg-card/80 transition-colors cursor-pointer"
+                                    className="border-border/40 bg-card/30 backdrop-blur-sm hover:border-primary/25 hover:bg-card/50 transition-all cursor-pointer"
                                     onClick={() => setModalCustomerId(customer.id)}
                                 >
                                     <CardContent className="p-4">
@@ -212,7 +212,7 @@ export function CustomersPage() {
 
             {/* ── Customer detail modal ── */}
             <Dialog open={!!modalCustomerId} onOpenChange={open => !open && setModalCustomerId(null)}>
-                <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0 border-border/60 shadow-[0_0_80px_rgba(8,146,90,0.15),0_0_160px_rgba(8,146,90,0.06),0_16px_64px_rgba(0,0,0,0.6)]">
+                <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0 border-primary/15 shadow-[0_0_80px_rgba(8,146,90,0.18),0_0_160px_rgba(8,146,90,0.08),0_16px_64px_rgba(0,0,0,0.6)]">
                     <div className="overflow-y-auto flex-1 px-6 pb-6 pt-6">
                         {modalCustomerId && (
                             <CustomerDetailPanel
