@@ -421,12 +421,16 @@ export function LeadsPage() {
                         )}
 
                         {/* AI response */}
-                        {modalLead?.ai_response && (
+                        {(modalLead?.ai_response?.trim() || modalLead?.similarity != null) && (
                             <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg p-3">
                                 <p className="text-xs font-medium text-blue-400 mb-1.5">AI-svar</p>
-                                <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{modalLead.ai_response}</p>
+                                {modalLead?.ai_response?.trim() ? (
+                                    <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{modalLead.ai_response.trim()}</p>
+                                ) : (
+                                    <p className="text-sm text-zinc-500 italic">AI-svaret lagrades inte för detta lead.</p>
+                                )}
                                 {modalLead.similarity != null && (
-                                    <p className="text-xs text-zinc-600 mt-2">Matchning: {(modalLead.similarity * 100).toFixed(0)}%</p>
+                                    <p className="text-xs text-zinc-500 mt-2 border-t border-blue-900/30 pt-2">Matchning: {(modalLead.similarity * 100).toFixed(0)}%</p>
                                 )}
                             </div>
                         )}
