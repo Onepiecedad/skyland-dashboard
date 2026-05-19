@@ -6,10 +6,9 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Badge } from '../components/ui/badge';
 import {
     LogOut, ArrowLeft, Mail, Phone, Building2, Plus, ChevronDown, ChevronUp,
-    Clock, Zap, Globe, StickyNote, Folder
+    Clock, Zap, Globe, StickyNote, Folder, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -282,6 +281,48 @@ export function CustomerDetailPage() {
         }
     };
 
+    const handleDeleteProject = async (projectId, projectName) => {
+        if (!window.confirm(`Radera projektet "${projectName}" permanent?`)) return;
+        try {
+            const { error } = await supabase.from('projects').delete().eq('id', projectId);
+            if (error) throw error;
+            await logActivity('project_deleted', `${projectName} raderat`);
+            toast.success(`${projectName} raderat`);
+            setCompanies(prev => prev.map(co => ({
+                ...co,
+                projects: (co.projects || []).filter(p => p.id !== projectId),
+            })));
+            if (expandedProjectId === projectId) setExpandedProjectId(null);
+        } catch {
+            toast.error('Kunde inte radera projekt');
+        }
+    };
+
+    const handleDeleteCompany = async (companyId, companyName) => {
+        if (!window.confirm(`Radera "${companyName}" och alla tillhörande projekt permanent?`)) return;
+        try {
+            const { error } = await supabase.from('companies').delete().eq('id', companyId);
+            if (error) throw error;
+            await logActivity('company_deleted', `${companyName} raderat`);
+            toast.success(`${companyName} raderat`);
+            setCompanies(prev => prev.filter(co => co.id !== companyId));
+        } catch {
+            toast.error('Kunde inte radera företag');
+        }
+    };
+
+    const handleDeleteCustomer = async () => {
+        if (!window.confirm(`Radera kunden "${customer.full_name}" och alla företag/projekt permanent? Åtgärden kan inte ångras.`)) return;
+        try {
+            const { error } = await supabase.from('customers').delete().eq('id', id);
+            if (error) throw error;
+            toast.success('Kund raderad');
+            navigate('/customers');
+        } catch {
+            toast.error('Kunde inte radera kund');
+        }
+    };
+
     const handleLogout = async () => {
         await supabase.auth.signOut();
         window.location.href = '/login';
@@ -413,11 +454,19 @@ export function CustomerDetailPage() {
                                 ) : (
                                     companies.map(co => (
                                         <div key={co.id} className="space-y-1.5 pb-3 border-b border-border/30 last:border-0 last:pb-0">
-                                            <InlineText
-                                                value={co.name}
-                                                onSave={v => saveCompanyField(co.id, 'name', v)}
-                                                className="text-sm font-medium"
-                                            />
+                                            <div className="flex items-center justify-between gap-1">
+                                                <InlineText
+                                                    value={co.name}
+                                                    onSave={v => saveCompanyField(co.id, 'name', v)}
+                                                    className="text-sm font-medium"
+                                                />
+                                                <button
+                                                    onClick={() => handleDeleteCompany(co.id, co.name)}
+                                                    className="text-zinc-700 hover:text-red-400 transition-colors shrink-0"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </button>
+                                            </div>
                                             <div className="flex items-center gap-1.5">
                                                 <Building2 className="h-3 w-3 text-zinc-600 shrink-0" />
                                                 <InlineText
@@ -581,6 +630,14 @@ export function CustomerDetailPage() {
                                                 {/* Expanded */}
                                                 {isExpanded && (
                                                     <div className="px-3 pb-3 border-t border-border/30 space-y-3 pt-3" onClick={e => e.stopPropagation()}>
+                                                        <div className="flex justify-end">
+                                                            <button
+                                                                onClick={() => handleDeleteProject(project.id, project.name)}
+                                                                className="flex items-center gap-1 text-[11px] text-zinc-600 hover:text-red-400 transition-colors"
+                                                            >
+                                                                <Trash2 className="h-3 w-3" /> Radera projekt
+                                                            </button>
+                                                        </div>
                                                         {/* Status select */}
                                                         <div>
                                                             <p className="text-xs text-zinc-600 mb-1">Status</p>
@@ -660,6 +717,16 @@ export function CustomerDetailPage() {
                         )}
                     </CardContent>
                 </Card>
+
+                {/* Delete customer */}
+                <div className="flex justify-end pb-2">
+                    <button
+                        onClick={handleDeleteCustomer}
+                        className="flex items-center gap-1.5 text-xs text-zinc-700 hover:text-red-400 transition-colors"
+                    >
+                        <Trash2 className="h-3 w-3" /> Radera kund
+                    </button>
+                </div>
             </main>
 
             {/* ── Add Company Modal ── */}

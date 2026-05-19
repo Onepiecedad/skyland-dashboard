@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { LogOut, ChevronDown, ChevronUp, Building2, Mail, Zap, UserPlus } from 'lucide-react';
+import { LogOut, ChevronDown, ChevronUp, Building2, Mail, Zap, UserPlus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
@@ -141,6 +141,20 @@ export function LeadsPage() {
         } catch (error) {
             console.error('Error updating status:', error);
             toast.error('Kunde inte uppdatera status');
+        }
+    };
+
+    const handleDeleteLead = async (e, id) => {
+        e.stopPropagation();
+        if (!window.confirm('Radera lead permanent?')) return;
+        try {
+            const { error } = await supabase.from('prospects').delete().eq('id', id);
+            if (error) throw error;
+            toast.success('Lead raderat');
+            setLeads(prev => prev.filter(l => l.id !== id));
+            if (expandedId === id) setExpandedId(null);
+        } catch {
+            toast.error('Kunde inte radera lead');
         }
     };
 
@@ -406,6 +420,14 @@ export function LeadsPage() {
                                                             {conf.label}
                                                         </Button>
                                                     ))}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0 text-zinc-600 hover:text-red-400"
+                                                        onClick={e => handleDeleteLead(e, lead.id)}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
                                                     <div className="ml-auto">
                                                         {alreadyCustomer ? (
                                                             <Button
