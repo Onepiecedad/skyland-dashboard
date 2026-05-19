@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
-import { LogOut, Users, Clock, TrendingUp, ChevronDown, ChevronUp, Building2, Mail, Zap } from 'lucide-react';
+import { Input } from '../components/ui/input';
+import { LogOut, ChevronDown, ChevronUp, Building2, Mail, Zap, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
@@ -17,6 +18,20 @@ const STATUS_CONFIG = {
     förlorad:   { label: 'Förlorad',   color: 'bg-red-500/10 text-red-400 border-red-500/20' },
     arkiverad:  { label: 'Arkiverad',  color: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
 };
+
+const PROJECT_TYPES = [
+    { value: 'ai-system',          label: 'AI-system' },
+    { value: 'hemsida',            label: 'Hemsida' },
+    { value: 'automation',         label: 'Automation' },
+    { value: 'drift-och-säkerhet', label: 'Drift & säkerhet' },
+    { value: 'konsultation',       label: 'Konsultation' },
+];
+
+const INDUSTRIES = [
+    'Livsmedel', 'Marin service', 'Artist', 'Event/Upplevelser',
+    'Industriservice', 'Bygg & fastighet', 'Hälsa & välmående',
+    'Handel & e-handel', 'Konsultation', 'Övrigt',
+];
 
 function StatusBadge({ status }) {
     const config = STATUS_CONFIG[status] || STATUS_CONFIG['ny'];
@@ -40,14 +55,9 @@ function ScoreBadge({ score }) {
 
 function RelativeTime({ date }) {
     if (!date) return null;
-    const formatted = formatDistanceToNow(new Date(date), { addSuffix: true, locale: sv });
     return (
-        <time
-            dateTime={date}
-            title={new Date(date).toLocaleString('sv-SE')}
-            className="text-xs text-zinc-500"
-        >
-            {formatted}
+        <time dateTime={date} title={new Date(date).toLocaleString('sv-SE')} className="text-xs text-zinc-500">
+            {formatDistanceToNow(new Date(date), { addSuffix: true, locale: sv })}
         </time>
     );
 }
@@ -57,6 +67,13 @@ export function LeadsPage() {
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('alla');
     const [expandedId, setExpandedId] = useState(null);
+
+    // Conversion modal
+    const [convertingLead, setConvertingLead] = useState(null);
+    const [convertForm, setConvertForm] = useState({ full_name: '', company_name: '', industry: '', project_type: 'konsultation' });
+    const [converting, setConverting] = useState(false);
+
+    const navigate = useNavigate();
 
     const fetchLeads = async () => {
         try {
@@ -72,7 +89,6 @@ export function LeadsPage() {
             const { data: prospects, error: pErr } = await query;
             if (pErr) throw pErr;
 
-            // Fetch AI responses from interactions
             const sessionUuids = (prospects || []).map(p => p.session_uuid).filter(Boolean);
             let interactionsMap = {};
 
@@ -88,7 +104,6 @@ export function LeadsPage() {
                 });
             }
 
-            // Combine
             const combined = (prospects || []).map(p => ({
                 ...p,
                 ai_response: interactionsMap[p.session_uuid]?.ai_response || null,
@@ -104,42 +119,101 @@ export function LeadsPage() {
         }
     };
 
-    useEffect(() => {
-        fetchLeads();
-    }, [statusFilter]);
+    useEffect(() => { fetchLeads(); }, [statusFilter]);
 
-    // Realtime subscription
     useEffect(() => {
         const channel = supabase
             .channel('prospects-realtime')
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'prospects' },
-                (payload) => {
-                    toast.info(`Ny lead: ${payload.new.name || 'Okänd'}`);
-                    fetchLeads();
-                }
-            )
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'prospects' }, (payload) => {
+                toast.info(`Ny lead: ${payload.new.name || 'Okänd'}`);
+                fetchLeads();
+            })
             .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => supabase.removeChannel(channel);
     }, []);
 
     const handleStatusChange = async (id, newStatus) => {
         try {
-            const { error } = await supabase
-                .from('prospects')
-                .update({ status: newStatus })
-                .eq('id', id);
-
+            const { error } = await supabase.from('prospects').update({ status: newStatus }).eq('id', id);
             if (error) throw error;
             toast.success(`Status ändrad till ${STATUS_CONFIG[newStatus]?.label || newStatus}`);
             fetchLeads();
         } catch (error) {
             console.error('Error updating status:', error);
             toast.error('Kunde inte uppdatera status');
+        }
+    };
+
+    const openConvertModal = (lead) => {
+        setConvertingLead(lead);
+        setConvertForm({
+            full_name: lead.name || '',
+            company_name: lead.company || '',
+            industry: '',
+            project_type: 'konsultation',
+        });
+    };
+
+    const handleConvert = async () => {
+        if (!convertForm.full_name.trim()) { toast.error('Namn krävs'); return; }
+        if (!convertForm.company_name.trim()) { toast.error('Företagsnamn krävs'); return; }
+        setConverting(true);
+        try {
+            // 1. Create customer
+            const { data: customer, error: custErr } = await supabase
+                .from('customers')
+                .insert({ full_name: convertForm.full_name.trim(), email: convertingLead.email || null })
+                .select()
+                .single();
+            if (custErr) throw custErr;
+
+            // 2. Create company
+            const { data: company, error: compErr } = await supabase
+                .from('companies')
+                .insert({
+                    customer_id: customer.id,
+                    name: convertForm.company_name.trim(),
+                    industry: convertForm.industry || null,
+                })
+                .select()
+                .single();
+            if (compErr) throw compErr;
+
+            // 3. Create project
+            const { data: project, error: projErr } = await supabase
+                .from('projects')
+                .insert({
+                    company_id: company.id,
+                    name: PROJECT_TYPES.find(t => t.value === convertForm.project_type)?.label || convertForm.project_type,
+                    project_type: convertForm.project_type,
+                    status: 'lead',
+                })
+                .select()
+                .single();
+            if (projErr) throw projErr;
+
+            // 4. Link prospect to customer
+            await supabase.from('prospects').update({ customer_id: customer.id }).eq('id', convertingLead.id);
+
+            // 5. Log activity
+            await supabase.from('activity_log').insert({
+                action: 'customer_created',
+                description: `Konverterad från prospect "${convertingLead.name || convertingLead.email}"`,
+                customer_id: customer.id,
+                company_id: company.id,
+                project_id: project.id,
+                actor: 'user',
+                metadata: { prospect_id: convertingLead.id },
+            });
+
+            toast.success('Kund skapad');
+            setConvertingLead(null);
+            navigate(`/customers/${customer.id}`);
+        } catch (err) {
+            console.error(err);
+            toast.error('Kunde inte skapa kund');
+        } finally {
+            setConverting(false);
         }
     };
 
@@ -150,7 +224,6 @@ export function LeadsPage() {
         window.location.href = '/login';
     };
 
-    // Stats
     const stats = {
         total: leads.length,
         nya: leads.filter(l => l.status === 'ny' || !l.status).length,
@@ -160,7 +233,6 @@ export function LeadsPage() {
 
     return (
         <div className="min-h-screen bg-background">
-            {/* Top bar */}
             <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
                 <div className="max-w-5xl mx-auto flex items-center justify-between px-4 h-14">
                     <div className="flex items-center gap-6">
@@ -173,10 +245,10 @@ export function LeadsPage() {
                                 Leads
                             </Link>
                             <Link
-                                to="/engagements"
-                                className={`text-sm transition-colors ${location.pathname === '/engagements' ? 'text-foreground' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                to="/customers"
+                                className={`text-sm transition-colors ${location.pathname.startsWith('/customers') ? 'text-foreground' : 'text-zinc-500 hover:text-zinc-300'}`}
                             >
-                                Engagements
+                                Kunder
                             </Link>
                         </nav>
                     </div>
@@ -247,6 +319,7 @@ export function LeadsPage() {
                     <div className="space-y-2">
                         {leads.map((lead) => {
                             const isExpanded = expandedId === lead.id;
+                            const alreadyCustomer = !!lead.customer_id;
 
                             return (
                                 <Card
@@ -319,8 +392,8 @@ export function LeadsPage() {
                                                     </div>
                                                 )}
 
-                                                {/* Status actions */}
-                                                <div className="flex flex-wrap gap-2">
+                                                {/* Status actions + convert button */}
+                                                <div className="flex flex-wrap gap-2 items-center">
                                                     {Object.entries(STATUS_CONFIG).map(([key, conf]) => (
                                                         <Button
                                                             key={key}
@@ -333,6 +406,28 @@ export function LeadsPage() {
                                                             {conf.label}
                                                         </Button>
                                                     ))}
+                                                    <div className="ml-auto">
+                                                        {alreadyCustomer ? (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-7 text-xs text-zinc-500"
+                                                                onClick={() => navigate(`/customers/${lead.customer_id}`)}
+                                                            >
+                                                                Visa kund →
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-7 text-xs border-zinc-600 text-zinc-300 hover:text-white hover:border-zinc-400"
+                                                                onClick={() => openConvertModal(lead)}
+                                                            >
+                                                                <UserPlus className="h-3 w-3 mr-1" />
+                                                                Konvertera till kund
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
@@ -343,6 +438,78 @@ export function LeadsPage() {
                     </div>
                 )}
             </main>
+
+            {/* Convert to customer modal */}
+            <Dialog open={!!convertingLead} onOpenChange={open => { if (!open) setConvertingLead(null); }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Konvertera till kund</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                        <div>
+                            <label className="text-xs text-zinc-500 mb-1 block">Personnamn *</label>
+                            <Input
+                                value={convertForm.full_name}
+                                onChange={e => setConvertForm(f => ({ ...f, full_name: e.target.value }))}
+                                placeholder="Förnamn Efternamn"
+                                className="text-sm border-border/50"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-500 mb-1 block">Företagsnamn *</label>
+                            <Input
+                                value={convertForm.company_name}
+                                onChange={e => setConvertForm(f => ({ ...f, company_name: e.target.value }))}
+                                placeholder="Företaget AB"
+                                className="text-sm border-border/50"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-500 mb-1 block">Bransch</label>
+                            <Select
+                                value={convertForm.industry}
+                                onValueChange={v => setConvertForm(f => ({ ...f, industry: v }))}
+                            >
+                                <SelectTrigger className="text-sm border-border/50">
+                                    <SelectValue placeholder="Välj bransch" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {INDUSTRIES.map(ind => (
+                                        <SelectItem key={ind} value={ind}>{ind}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-500 mb-1 block">Initial projekttyp</label>
+                            <Select
+                                value={convertForm.project_type}
+                                onValueChange={v => setConvertForm(f => ({ ...f, project_type: v }))}
+                            >
+                                <SelectTrigger className="text-sm border-border/50">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {PROJECT_TYPES.map(t => (
+                                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {convertingLead?.email && (
+                            <p className="text-xs text-zinc-600">
+                                Email <span className="text-zinc-400">{convertingLead.email}</span> kopplas till kunden.
+                            </p>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" size="sm" onClick={() => setConvertingLead(null)}>Avbryt</Button>
+                        <Button size="sm" onClick={handleConvert} disabled={converting}>
+                            {converting ? 'Skapar...' : 'Skapa kund'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

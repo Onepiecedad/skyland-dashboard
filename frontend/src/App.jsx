@@ -5,7 +5,8 @@ import { queryClient, QueryClientProvider } from './lib/queryClient';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { LeadsPage } from './pages/LeadsPage';
-import { EngagementsPage } from './pages/EngagementsPage';
+import { CustomersPage } from './pages/CustomersPage';
+import { CustomerDetailPage } from './pages/CustomerDetailPage';
 
 function App() {
     return (
@@ -34,10 +35,29 @@ function App() {
                         />
 
                         <Route
+                            path="/customers"
+                            element={
+                                <ProtectedRoute>
+                                    <CustomersPage />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        <Route
+                            path="/customers/:id"
+                            element={
+                                <ProtectedRoute>
+                                    <CustomerDetailPage />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        {/* Bakåtkompatibilitet — engagements → customers */}
+                        <Route
                             path="/engagements"
                             element={
                                 <ProtectedRoute>
-                                    <EngagementsPage />
+                                    <Navigate to="/customers" replace />
                                 </ProtectedRoute>
                             }
                         />
