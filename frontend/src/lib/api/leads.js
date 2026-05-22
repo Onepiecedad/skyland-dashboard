@@ -54,6 +54,19 @@ export async function fetchLeads(statusFilter = 'alla') {
     }));
 }
 
+export async function fetchUnlinkedVoiceCalls() {
+    const { data, error } = await supabase
+        .from('voice_calls')
+        .select('id, session_uuid, provider, external_call_id, call_source, started_at, ended_at, duration_seconds, transcript, summary, recording_url, created_at')
+        .is('prospect_id', null)
+        .is('customer_id', null)
+        .order('created_at', { ascending: false })
+        .limit(25);
+
+    if (error) throw error;
+    return data || [];
+}
+
 export async function updateLeadStatus(leadId, status) {
     const { error } = await supabase.from('prospects').update({ status }).eq('id', leadId);
     if (error) throw error;
