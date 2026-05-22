@@ -539,6 +539,11 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
                                                                     {call.summary && (
                                                                         <p className="mt-1 text-xs text-zinc-300 leading-relaxed">{call.summary}</p>
                                                                     )}
+                                                                    {call.recording_url && (
+                                                                        <div className="mt-1">
+                                                                            <audio controls src={call.recording_url} className="h-7 w-full max-w-[200px]" preload="none" />
+                                                                        </div>
+                                                                    )}
                                                                     {call.transcript && (
                                                                         <details className="mt-1 text-xs text-zinc-400">
                                                                             <summary className="cursor-pointer select-none text-zinc-500 hover:text-zinc-300">
@@ -592,6 +597,11 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
                                             <p className="text-xs text-zinc-300 leading-relaxed">{call.summary}</p>
                                         ) : (
                                             <p className="text-xs text-zinc-500 italic">Ingen sammanfattning sparades.</p>
+                                        )}
+                                        {call.recording_url && (
+                                            <div className="mt-2 mb-1">
+                                                <audio controls src={call.recording_url} className="h-8 w-full max-w-[240px]" preload="none" />
+                                            </div>
                                         )}
                                         {call.transcript && (
                                             <details className="text-xs text-zinc-400">
