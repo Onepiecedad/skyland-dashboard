@@ -117,16 +117,34 @@ export async function createProject(payload) {
 }
 
 export async function deleteProject(projectId) {
-    const { error } = await supabase.from('projects').delete().eq('id', projectId);
+    const { data, error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId)
+        .select('id');
+
     if (error) throw error;
+    if (!data || data.length === 0) throw new Error('Projekt kunde inte raderas');
 }
 
 export async function deleteCompany(companyId) {
-    const { error } = await supabase.from('companies').delete().eq('id', companyId);
+    const { data, error } = await supabase
+        .from('companies')
+        .delete()
+        .eq('id', companyId)
+        .select('id');
+
     if (error) throw error;
+    if (!data || data.length === 0) throw new Error('Företag kunde inte raderas');
 }
 
 export async function deleteCustomer(customerId) {
-    const { error } = await supabase.from('customers').delete().eq('id', customerId);
+    const { data, error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', customerId)
+        .select('id');
+
     if (error) throw error;
+    if (!data || data.length === 0) throw new Error('Kund kunde inte raderas');
 }

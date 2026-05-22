@@ -174,6 +174,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
     const error = detailQuery.isError;
 
     const invalidateDetail = () => queryClient.invalidateQueries({ queryKey: ['customer-detail', id] });
+    const invalidateCustomers = () => queryClient.invalidateQueries({ queryKey: ['customers'] });
 
     const logActivity = useCallback(async (action, description, opts = {}) => {
         try {
@@ -188,6 +189,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
         onSuccess: async (_data, variables) => {
             await logActivity('customer_updated', `${variables.field} uppdaterat`);
             invalidateDetail();
+            invalidateCustomers();
             toast.success('Sparat');
         },
     });
@@ -197,6 +199,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
         onSuccess: async (_data, variables) => {
             await logActivity('company_updated', `${variables.field} uppdaterat`, { company_id: variables.companyId });
             invalidateDetail();
+            invalidateCustomers();
             toast.success('Sparat');
         },
     });
@@ -211,6 +214,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
                 });
             }
             invalidateDetail();
+            invalidateCustomers();
             toast.success('Sparat');
         },
     });
@@ -241,6 +245,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
             setShowAddCompany(false);
             setAddCompanyForm({ name: '', industry: '', website: '', notes: '' });
             invalidateDetail();
+            invalidateCustomers();
         } catch {
             toast.error('Kunde inte skapa företag');
         } finally {
@@ -265,6 +270,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
             setShowAddProject(false);
             setAddProjectForm({ name: '', company_id: '', project_type: 'konsultation', status: 'lead', next_step: '' });
             invalidateDetail();
+            invalidateCustomers();
         } catch {
             toast.error('Kunde inte skapa projekt');
         } finally {
@@ -279,6 +285,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
             await logActivity('project_deleted', `${projectName} raderat`);
             toast.success(`${projectName} raderat`);
             invalidateDetail();
+            invalidateCustomers();
             if (expandedProjectId === projectId) setExpandedProjectId(null);
         } catch {
             toast.error('Kunde inte radera projekt');
@@ -292,6 +299,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
             await logActivity('company_deleted', `${companyName} raderat`);
             toast.success(`${companyName} raderat`);
             invalidateDetail();
+            invalidateCustomers();
         } catch {
             toast.error('Kunde inte radera företag');
         }
@@ -301,6 +309,11 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
         if (!window.confirm(`Radera kunden "${customer.full_name}" och alla företag/projekt permanent? Åtgärden kan inte ångras.`)) return;
         try {
             await customerDetailAPI.deleteCustomer(id);
+            queryClient.setQueryData(['customers'], (old) =>
+                Array.isArray(old) ? old.filter((existingCustomer) => existingCustomer.id !== id) : old
+            );
+            queryClient.removeQueries({ queryKey: ['customer-detail', id] });
+            invalidateCustomers();
             toast.success('Kund raderad');
             if (onDeleted) onDeleted();
             else navigate('/customers');

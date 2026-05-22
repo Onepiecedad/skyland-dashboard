@@ -73,13 +73,29 @@ export async function updateLeadStatus(leadId, status) {
 }
 
 export async function deleteLead(leadId) {
-    const { error } = await supabase.from('prospects').delete().eq('id', leadId);
+    const { data, error } = await supabase
+        .from('prospects')
+        .delete()
+        .eq('id', leadId)
+        .select('id');
+
     if (error) throw error;
+    if (!data || data.length === 0) {
+        throw new Error('Lead kunde inte raderas');
+    }
 }
 
 export async function deleteLeads(leadIds) {
-    const { error } = await supabase.from('prospects').delete().in('id', leadIds);
+    const { data, error } = await supabase
+        .from('prospects')
+        .delete()
+        .in('id', leadIds)
+        .select('id');
+
     if (error) throw error;
+    if (!data || data.length !== leadIds.length) {
+        throw new Error('Alla leads kunde inte raderas');
+    }
 }
 
 export async function convertLeadToCustomer(lead, form, projectTypes) {

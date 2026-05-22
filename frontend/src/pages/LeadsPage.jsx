@@ -89,6 +89,7 @@ export function LeadsPage() {
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [modalLead, setModalLead] = useState(null);
+    const [selectedVoiceCall, setSelectedVoiceCall] = useState(null);
 
     const [convertingLead, setConvertingLead] = useState(null);
     const [convertForm, setConvertForm] = useState({ full_name: '', company_name: '', industry: '', project_type: 'konsultation' });
@@ -146,21 +147,27 @@ export function LeadsPage() {
         mutationFn: (id) => leadsAPI.deleteLead(id),
         onSuccess: (_data, id) => {
             toast.success('Lead raderat');
+            queryClient.setQueriesData({ queryKey: ['leads'] }, (old) =>
+                Array.isArray(old) ? old.filter((lead) => lead.id !== id) : old
+            );
             queryClient.invalidateQueries({ queryKey: ['leads'] });
             setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
             if (modalLead?.id === id) setModalLead(null);
         },
-        onError: () => toast.error('Kunde inte radera lead'),
+        onError: (error) => toast.error(error?.message || 'Kunde inte radera lead'),
     });
 
     const deleteLeadsMutation = useMutation({
         mutationFn: (ids) => leadsAPI.deleteLeads(ids),
         onSuccess: (_data, ids) => {
             toast.success(`${ids.length} leads raderade`);
+            queryClient.setQueriesData({ queryKey: ['leads'] }, (old) =>
+                Array.isArray(old) ? old.filter((lead) => !ids.includes(lead.id)) : old
+            );
             queryClient.invalidateQueries({ queryKey: ['leads'] });
             setSelectedIds(new Set());
         },
-        onError: () => toast.error('Kunde inte radera leads'),
+        onError: (error) => toast.error(error?.message || 'Kunde inte radera leads'),
     });
 
     const convertLeadMutation = useMutation({
@@ -228,79 +235,68 @@ export function LeadsPage() {
                     <Card className="border-primary/15 bg-card/30 backdrop-blur-sm shadow-[0_0_30px_rgba(8,146,90,0.06)]"><CardContent className="p-4"><p className="text-xs text-zinc-500 mb-1">Bokade</p><p className="text-2xl font-bold text-primary">{stats.bokade}</p></CardContent></Card>
                 </div>
 
-                <Card className="border-border/50 bg-card/40 backdrop-blur-sm">
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                            <div>
-                                <h2 className="text-sm font-medium text-zinc-300">
-                                    Okopplade röstsamtal <span className="text-zinc-600">({unlinkedVoiceCalls.length})</span>
-                                </h2>
-                                <p className="text-xs text-zinc-500">
-                                    Samtal som sparats i `voice_calls` men ännu inte kopplats till prospect eller kund.
-                                </p>
-                            </div>
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 className="text-sm font-medium text-zinc-400">
+                                Okopplade röstsamtal <span className="text-zinc-600">({unlinkedVoiceCalls.length})</span>
+                            </h2>
+                            <p className="text-xs text-zinc-500">
+                                Samtal som sparats men ännu inte kopplats till prospect eller kund.
+                            </p>
                         </div>
+                    </div>
 
-                        {unlinkedVoiceCallsQuery.isLoading ? (
-                            <div className="space-y-2">
-                                {[...Array(2)].map((_, i) => <div key={i} className="h-16 rounded-lg bg-card/30 animate-pulse" />)}
-                            </div>
-                        ) : unlinkedVoiceCalls.length === 0 ? (
-                            <p className="text-sm text-zinc-500 italic">Inga okopplade röstsamtal just nu.</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {unlinkedVoiceCalls.map((call) => (
-                                    <div key={call.id} className="rounded-lg border border-border/40 bg-background/30 p-3 space-y-2">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-medium text-zinc-200">
-                                                    Voice call
-                                                </p>
-                                                <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                                                    {call.created_at && (
-                                                        <time dateTime={call.created_at}>
-                                                            {format(new Date(call.created_at), "d MMM yyyy 'kl.' HH:mm", { locale: sv })}
-                                                        </time>
-                                                    )}
-                                                    {formatDuration(call.duration_seconds) && (
-                                                        <span>{formatDuration(call.duration_seconds)}</span>
-                                                    )}
-                                                    <span className="font-mono text-[11px] text-zinc-600">
-                                                        {call.session_uuid}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20 shrink-0">
-                                                Okopplat
+                    {unlinkedVoiceCallsQuery.isLoading ? (
+                        <div className="space-y-1.5">
+                            {[...Array(2)].map((_, i) => <div key={i} className="h-14 rounded-lg bg-card/30 animate-pulse" />)}
+                        </div>
+                    ) : unlinkedVoiceCalls.length === 0 ? (
+                        <Card className="border-border/50">
+                            <CardContent className="p-8 text-center">
+                                <Phone className="h-8 w-8 mx-auto mb-3 text-zinc-600" />
+                                <p className="text-sm text-zinc-400">Inga okopplade röstsamtal just nu</p>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="space-y-1.5">
+                            {unlinkedVoiceCalls.map((call) => (
+                                <div
+                                    key={call.id}
+                                    className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border/40 bg-card/30 backdrop-blur-sm hover:border-border/60 hover:bg-card/50 transition-all cursor-pointer"
+                                    onClick={() => setSelectedVoiceCall(call)}
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <span className="font-medium text-sm truncate">
+                                                {call.summary?.trim() || 'Röstsamtal utan sammanfattning'}
                                             </span>
                                         </div>
-
-                                        {call.summary ? (
-                                            <p className="text-sm text-zinc-300 leading-relaxed">{call.summary}</p>
-                                        ) : (
-                                            <p className="text-sm text-zinc-500 italic">Ingen sammanfattning sparades för samtalet.</p>
-                                        )}
-
-                                        {call.recording_url && (
-                                            <audio controls src={call.recording_url} className="h-8 w-full max-w-[260px]" preload="none" />
-                                        )}
-
-                                        {call.transcript && (
-                                            <details className="text-xs text-zinc-400">
-                                                <summary className="cursor-pointer select-none text-zinc-500 hover:text-zinc-300">
-                                                    Visa transcript
-                                                </summary>
-                                                <pre className="mt-2 whitespace-pre-wrap font-sans text-xs leading-relaxed text-zinc-400">
-                                                    {call.transcript}
-                                                </pre>
-                                            </details>
-                                        )}
+                                        <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                                            {call.created_at && (
+                                                <time dateTime={call.created_at} title={new Date(call.created_at).toLocaleString('sv-SE')}>
+                                                    {formatDistanceToNow(new Date(call.created_at), { addSuffix: true, locale: sv })}
+                                                </time>
+                                            )}
+                                            {formatDuration(call.duration_seconds) && (
+                                                <span>{formatDuration(call.duration_seconds)}</span>
+                                            )}
+                                            <span className="font-mono text-[11px] text-zinc-600 truncate max-w-[180px]">
+                                                {call.session_uuid}
+                                            </span>
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">
+                                            Okopplat
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
                 {/* Filter + select-all + bulk delete */}
                 <div className="flex items-center justify-between gap-3">
@@ -544,6 +540,64 @@ export function LeadsPage() {
                             </Button>
                         )}
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!selectedVoiceCall} onOpenChange={open => { if (!open) setSelectedVoiceCall(null); }}>
+                <DialogContent className="sm:max-w-lg border-primary/15 shadow-[0_0_60px_rgba(8,146,90,0.15),0_0_120px_rgba(8,146,90,0.06),0_8px_32px_rgba(0,0,0,0.5)]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 pr-6">
+                            <span className="truncate">Okopplat röstsamtal</span>
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {selectedVoiceCall?.created_at && (
+                                <span className="text-xs text-zinc-500">
+                                    {format(new Date(selectedVoiceCall.created_at), "d MMM yyyy 'kl.' HH:mm", { locale: sv })}
+                                </span>
+                            )}
+                            {formatDuration(selectedVoiceCall?.duration_seconds) && (
+                                <span className="text-xs text-zinc-500">{formatDuration(selectedVoiceCall.duration_seconds)}</span>
+                            )}
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">
+                                Okopplat
+                            </span>
+                        </div>
+
+                        {selectedVoiceCall?.summary ? (
+                            <div className="bg-card/60 border border-border/50 rounded-lg p-3">
+                                <p className="text-xs text-zinc-500 mb-1.5">Sammanfattning</p>
+                                <p className="text-sm text-zinc-300 leading-relaxed">{selectedVoiceCall.summary}</p>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-zinc-500 italic">Ingen sammanfattning sparades för samtalet.</p>
+                        )}
+
+                        <div className="space-y-1.5">
+                            <p className="text-xs text-zinc-500">Session</p>
+                            <p className="text-xs font-mono text-zinc-400 break-all">{selectedVoiceCall?.session_uuid}</p>
+                        </div>
+
+                        {selectedVoiceCall?.recording_url && (
+                            <div className="space-y-1.5">
+                                <p className="text-xs text-zinc-500">Inspelning</p>
+                                <audio controls src={selectedVoiceCall.recording_url} className="h-8 w-full" preload="none" />
+                            </div>
+                        )}
+
+                        {selectedVoiceCall?.transcript && (
+                            <div>
+                                <p className="text-xs text-zinc-500 mb-1.5">Transcript</p>
+                                <div className="max-h-64 overflow-y-auto rounded-lg border border-border/50 bg-card/40 p-3">
+                                    <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-zinc-400">
+                                        {selectedVoiceCall.transcript}
+                                    </pre>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </DialogContent>
             </Dialog>
 
