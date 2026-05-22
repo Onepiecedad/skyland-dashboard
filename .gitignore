@@ -79,10 +79,15 @@ agenthub/agents/youtube/db
 # Mobile development
 android-sdk/ .env
 
-# Secrets
+# Env-filer — alla varianter
 .env
-frontend/.env
-backend/.env
+.env.*
+**/.env
+**/.env.*
+
+# Tillåt explicit exempel-filer som ska in i repo
+!.env.example
+!.env.tmp.example
 
 # Local Netlify folder
 .netlify
