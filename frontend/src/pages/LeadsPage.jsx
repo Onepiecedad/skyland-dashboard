@@ -14,38 +14,7 @@ import { leadsAPI } from '../lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DashboardShell } from '../components/DashboardShell';
 import { VoiceCallExtractedData } from '../components/VoiceCallExtractedData';
-
-const STATUS_CONFIG = {
-    ny:        { label: 'Ny',        color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-    kontaktad: { label: 'Kontaktad', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
-    bokad:     { label: 'Bokad',     color: 'bg-green-500/10 text-green-400 border-green-500/20' },
-    förlorad:  { label: 'Förlorad',  color: 'bg-red-500/10 text-red-400 border-red-500/20' },
-    arkiverad: { label: 'Arkiverad', color: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
-};
-
-const SOURCE_CONFIG = {
-    facebook:     { label: 'Facebook Ads' },
-    facebook_ads: { label: 'Facebook Ads' },
-    hemsida:      { label: 'Hemsida' },
-    website:      { label: 'Hemsida' },
-    ai_agent:     { label: 'AI-agent' },
-    email:        { label: 'E-post' },
-    manual:       { label: 'Manuell' },
-};
-
-const PROJECT_TYPES = [
-    { value: 'ai-system',          label: 'AI-system' },
-    { value: 'hemsida',            label: 'Hemsida' },
-    { value: 'automation',         label: 'Automation' },
-    { value: 'drift-och-säkerhet', label: 'Drift & säkerhet' },
-    { value: 'konsultation',       label: 'Konsultation' },
-];
-
-const INDUSTRIES = [
-    'Livsmedel', 'Marin service', 'Artist', 'Event/Upplevelser',
-    'Industriservice', 'Bygg & fastighet', 'Hälsa & välmående',
-    'Handel & e-handel', 'Konsultation', 'Övrigt',
-];
+import { LEAD_STATUS_CONFIG as STATUS_CONFIG, SOURCE_CONFIG, PROJECT_TYPES, INDUSTRIES } from '../lib/constants';
 
 function StatusBadge({ status }) {
     const config = STATUS_CONFIG[status] || STATUS_CONFIG['ny'];

@@ -68,8 +68,26 @@ export async function fetchUnlinkedVoiceCalls() {
 }
 
 export async function updateLeadStatus(leadId, status) {
+    const { data: prospect, error: fetchError } = await supabase
+        .from('prospects')
+        .select('customer_id')
+        .eq('id', leadId)
+        .single();
+
+    if (fetchError) throw fetchError;
+
     const { error } = await supabase.from('prospects').update({ status }).eq('id', leadId);
     if (error) throw error;
+
+    if (prospect?.customer_id) {
+        await supabase.from('activity_log').insert({
+            action: 'lead_status_changed',
+            description: `Leadstatus → ${status}`,
+            customer_id: prospect.customer_id,
+            actor: 'user',
+            metadata: { prospect_id: leadId, status },
+        });
+    }
 }
 
 export async function deleteLead(leadId) {

@@ -10,17 +10,10 @@ import { CustomerDetailPanel } from './CustomerDetailPanel';
 import { DashboardShell } from '../components/DashboardShell';
 import { customersAPI } from '../lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { PROJECT_STATUS_CONFIG } from '../lib/constants';
 
-const STATUS_COLORS = {
-    'i drift':   'bg-green-500/10 text-green-400 border-green-500/20',
-    'pågående':  'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-    'levererat': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    'lead':      'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    'pausat':    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    'avslutat':  'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
-};
-
-const STATUS_ORDER = ['i drift', 'pågående', 'levererat', 'lead', 'pausat', 'avslutat'];
+const STATUS_COLORS = Object.fromEntries(Object.entries(PROJECT_STATUS_CONFIG).map(([k, v]) => [k, v.color]));
+const STATUS_ORDER = Object.keys(PROJECT_STATUS_CONFIG);
 
 function getStatusSummary(companies) {
     const counts = {};

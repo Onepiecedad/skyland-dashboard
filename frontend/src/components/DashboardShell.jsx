@@ -1,15 +1,16 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { supabase } from '../lib/supabase';
 
 export function DashboardShell({ children, contentClassName = 'max-w-5xl mx-auto px-4 py-6' }) {
     const location = useLocation();
+    const navigate = useNavigate();
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
-        window.location.href = '/login';
+        navigate('/login', { replace: true });
     };
 
     return (
