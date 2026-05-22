@@ -15,18 +15,33 @@ export async function fetchLeads(statusFilter = 'alla') {
 
     const sessionUuids = (prospects || []).map((prospect) => prospect.session_uuid).filter(Boolean);
     const interactionsMap = {};
+    const voiceCallsMap = {};
 
     if (sessionUuids.length > 0) {
-        const { data: interactions, error: interactionsError } = await supabase
-            .from('interactions')
-            .select('session_uuid, payload')
-            .eq('type', 'form')
-            .in('session_uuid', sessionUuids);
+        const [{ data: interactions, error: interactionsError }, { data: voiceCalls, error: voiceCallsError }] = await Promise.all([
+            supabase
+                .from('interactions')
+                .select('session_uuid, payload')
+                .eq('type', 'form')
+                .in('session_uuid', sessionUuids),
+            supabase
+                .from('voice_calls')
+                .select('id, session_uuid, summary, transcript, duration_seconds, started_at, ended_at, recording_url, call_source, created_at')
+                .in('session_uuid', sessionUuids)
+                .order('created_at', { ascending: false }),
+        ]);
 
         if (interactionsError) throw interactionsError;
+        if (voiceCallsError) throw voiceCallsError;
 
         (interactions || []).forEach((interaction) => {
             interactionsMap[interaction.session_uuid] = interaction.payload;
+        });
+
+        (voiceCalls || []).forEach((voiceCall) => {
+            if (!voiceCallsMap[voiceCall.session_uuid]) {
+                voiceCallsMap[voiceCall.session_uuid] = voiceCall;
+            }
         });
     }
 
@@ -35,6 +50,7 @@ export async function fetchLeads(statusFilter = 'alla') {
         ai_response: interactionsMap[prospect.session_uuid]?.ai_response || null,
         similarity: interactionsMap[prospect.session_uuid]?.best_match_similarity || null,
         source: prospect.source || interactionsMap[prospect.session_uuid]?.source || null,
+        latest_voice_call: voiceCallsMap[prospect.session_uuid] || null,
     }));
 }
 

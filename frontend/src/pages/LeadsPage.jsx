@@ -76,6 +76,14 @@ function SourceBadge({ source }) {
     );
 }
 
+function formatDuration(durationSeconds) {
+    if (!durationSeconds || durationSeconds < 1) return null;
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    if (minutes < 1) return `${seconds}s`;
+    return `${minutes}m ${seconds}s`;
+}
+
 export function LeadsPage() {
     const [statusFilter, setStatusFilter] = useState('alla');
 
@@ -368,6 +376,37 @@ export function LeadsPage() {
                                 )}
                                 {modalLead.similarity != null && (
                                     <p className="text-xs text-zinc-500 mt-2 border-t border-primary/20 pt-2">Matchning: {(modalLead.similarity * 100).toFixed(0)}%</p>
+                                )}
+                            </div>
+                        )}
+
+                        {modalLead?.latest_voice_call && (
+                            <div className="bg-card/60 border border-border/50 rounded-lg p-3 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-medium text-zinc-300">Röstsamtal</p>
+                                    <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                                        {modalLead.latest_voice_call.created_at && (
+                                            <span>{format(new Date(modalLead.latest_voice_call.created_at), "d MMM yyyy 'kl.' HH:mm", { locale: sv })}</span>
+                                        )}
+                                        {formatDuration(modalLead.latest_voice_call.duration_seconds) && (
+                                            <span>{formatDuration(modalLead.latest_voice_call.duration_seconds)}</span>
+                                        )}
+                                    </div>
+                                </div>
+                                {modalLead.latest_voice_call.summary ? (
+                                    <p className="text-sm text-zinc-300 leading-relaxed">{modalLead.latest_voice_call.summary}</p>
+                                ) : (
+                                    <p className="text-sm text-zinc-500 italic">Ingen sammanfattning sparades för samtalet.</p>
+                                )}
+                                {modalLead.latest_voice_call.transcript && (
+                                    <details className="text-xs text-zinc-400">
+                                        <summary className="cursor-pointer select-none text-zinc-500 hover:text-zinc-300">
+                                            Visa transcript
+                                        </summary>
+                                        <pre className="mt-2 whitespace-pre-wrap font-sans text-xs leading-relaxed text-zinc-400">
+                                            {modalLead.latest_voice_call.transcript}
+                                        </pre>
+                                    </details>
                                 )}
                             </div>
                         )}

@@ -26,11 +26,42 @@ export async function fetchCustomerDetail(customerId) {
     if (prospectsRes.error) throw prospectsRes.error;
     if (activityRes.error) throw activityRes.error;
 
+    const prospects = prospectsRes.data || [];
+    const prospectIds = prospects.map((prospect) => prospect.id).filter(Boolean);
+    const voiceQueries = [
+        supabase
+            .from('voice_calls')
+            .select('id, session_uuid, prospect_id, customer_id, summary, transcript, duration_seconds, started_at, ended_at, recording_url, call_source, created_at')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false }),
+    ];
+
+    if (prospectIds.length > 0) {
+        voiceQueries.push(
+            supabase
+                .from('voice_calls')
+                .select('id, session_uuid, prospect_id, customer_id, summary, transcript, duration_seconds, started_at, ended_at, recording_url, call_source, created_at')
+                .in('prospect_id', prospectIds)
+                .order('created_at', { ascending: false })
+        );
+    }
+
+    const voiceResults = await Promise.all(voiceQueries);
+    const voiceCallsById = {};
+
+    voiceResults.forEach((result) => {
+        if (result.error) throw result.error;
+        (result.data || []).forEach((voiceCall) => {
+            voiceCallsById[voiceCall.id] = voiceCall;
+        });
+    });
+
     return {
         customer: customerRes.data,
         companies: companiesRes.data || [],
-        prospects: prospectsRes.data || [],
+        prospects,
         activityLog: activityRes.data || [],
+        voiceCalls: Object.values(voiceCallsById).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
     };
 }
 

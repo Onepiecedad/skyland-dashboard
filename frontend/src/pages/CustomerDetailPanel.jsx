@@ -46,6 +46,14 @@ const ACTIVITY_LABELS = {
     'notes_updated':          'Anteckningar uppdaterade',
 };
 
+function formatDuration(durationSeconds) {
+    if (!durationSeconds || durationSeconds < 1) return null;
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    if (minutes < 1) return `${seconds}s`;
+    return `${minutes}m ${seconds}s`;
+}
+
 // ─── Small reusable components ────────────────────────────────────────────────
 
 function InlineText({ value, onSave, placeholder = 'Klicka för att redigera', type = 'text', className = '' }) {
@@ -161,6 +169,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
     const companies = detailQuery.data?.companies || [];
     const prospects = detailQuery.data?.prospects || [];
     const activityLog = detailQuery.data?.activityLog || [];
+    const voiceCalls = detailQuery.data?.voiceCalls || [];
     const loading = detailQuery.isLoading;
     const error = detailQuery.isError;
 
@@ -476,6 +485,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
                             ) : (
                                 prospects.map(p => {
                                     const isExpanded = expandedProspectId === p.id;
+                                    const prospectVoiceCalls = voiceCalls.filter(call => call.prospect_id === p.id);
                                     return (
                                         <div
                                             key={p.id}
@@ -491,6 +501,11 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
                                                                 <Zap className="h-2.5 w-2.5" />{p.score}
                                                             </span>
                                                         )}
+                                                        {prospectVoiceCalls.length > 0 && (
+                                                            <span className="text-[11px] text-zinc-500 border border-border/40 rounded px-1.5 py-0.5">
+                                                                {prospectVoiceCalls.length} samtal
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <p className="text-xs text-zinc-500">
                                                         {p.created_at ? formatDistanceToNow(new Date(p.created_at), { addSuffix: true, locale: sv }) : ''}
@@ -503,14 +518,93 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
                                                     {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-zinc-600" /> : <ChevronDown className="h-3.5 w-3.5 text-zinc-600" />}
                                                 </div>
                                             </div>
-                                            {isExpanded && p.message && (
-                                                <p className="mt-2 text-xs text-zinc-400 leading-relaxed border-t border-border/30 pt-2">
-                                                    {p.message}
-                                                </p>
+                                            {isExpanded && (
+                                                <div className="mt-2 border-t border-border/30 pt-2 space-y-2">
+                                                    {p.message && (
+                                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                                            {p.message}
+                                                        </p>
+                                                    )}
+                                                    {prospectVoiceCalls.length > 0 && (
+                                                        <div className="space-y-2">
+                                                            {prospectVoiceCalls.map(call => (
+                                                                <div key={call.id} className="rounded border border-border/30 bg-background/40 p-2">
+                                                                    <div className="flex items-center justify-between gap-2">
+                                                                        <span className="text-[11px] text-zinc-500">Röstsamtal</span>
+                                                                        <div className="flex items-center gap-2 text-[11px] text-zinc-600">
+                                                                            {call.created_at && <span>{formatDistanceToNow(new Date(call.created_at), { addSuffix: true, locale: sv })}</span>}
+                                                                            {formatDuration(call.duration_seconds) && <span>{formatDuration(call.duration_seconds)}</span>}
+                                                                        </div>
+                                                                    </div>
+                                                                    {call.summary && (
+                                                                        <p className="mt-1 text-xs text-zinc-300 leading-relaxed">{call.summary}</p>
+                                                                    )}
+                                                                    {call.transcript && (
+                                                                        <details className="mt-1 text-xs text-zinc-400">
+                                                                            <summary className="cursor-pointer select-none text-zinc-500 hover:text-zinc-300">
+                                                                                Visa transcript
+                                                                            </summary>
+                                                                            <pre className="mt-2 whitespace-pre-wrap font-sans text-xs leading-relaxed text-zinc-400">
+                                                                                {call.transcript}
+                                                                            </pre>
+                                                                        </details>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     );
                                 })
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-border/50 bg-card/50">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-medium text-zinc-400">
+                                Voice Calls <span className="text-zinc-600 font-normal">({voiceCalls.length})</span>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {voiceCalls.length === 0 ? (
+                                <p className="text-sm text-zinc-600 italic">Inga röstsamtal sparade ännu.</p>
+                            ) : (
+                                voiceCalls.map(call => (
+                                    <div key={call.id} className="rounded-lg border border-border/40 bg-background/30 p-3 space-y-1.5">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                                <p className="text-sm font-medium">Voice call</p>
+                                                <p className="text-xs text-zinc-500">
+                                                    {call.created_at ? formatDistanceToNow(new Date(call.created_at), { addSuffix: true, locale: sv }) : ''}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[11px] text-zinc-600">
+                                                {call.prospect_id && (
+                                                    <span className="border border-border/40 rounded px-1.5 py-0.5">Prospect</span>
+                                                )}
+                                                {formatDuration(call.duration_seconds) && <span>{formatDuration(call.duration_seconds)}</span>}
+                                            </div>
+                                        </div>
+                                        {call.summary ? (
+                                            <p className="text-xs text-zinc-300 leading-relaxed">{call.summary}</p>
+                                        ) : (
+                                            <p className="text-xs text-zinc-500 italic">Ingen sammanfattning sparades.</p>
+                                        )}
+                                        {call.transcript && (
+                                            <details className="text-xs text-zinc-400">
+                                                <summary className="cursor-pointer select-none text-zinc-500 hover:text-zinc-300">
+                                                    Visa transcript
+                                                </summary>
+                                                <pre className="mt-2 whitespace-pre-wrap font-sans text-xs leading-relaxed text-zinc-400">
+                                                    {call.transcript}
+                                                </pre>
+                                            </details>
+                                        )}
+                                    </div>
+                                ))
                             )}
                         </CardContent>
                     </Card>
