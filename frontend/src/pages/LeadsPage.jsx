@@ -13,6 +13,7 @@ import { sv } from 'date-fns/locale';
 import { leadsAPI } from '../lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DashboardShell } from '../components/DashboardShell';
+import { VoiceCallExtractedData } from '../components/VoiceCallExtractedData';
 
 const STATUS_CONFIG = {
     ny:        { label: 'Ny',        color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
@@ -473,6 +474,7 @@ export function LeadsPage() {
                                         )}
                                     </div>
                                 </div>
+                                <VoiceCallExtractedData extractedData={modalLead.latest_voice_call.extracted_data} />
                                 {modalLead.latest_voice_call.summary ? (
                                     <p className="text-sm text-zinc-300 leading-relaxed">{modalLead.latest_voice_call.summary}</p>
                                 ) : (
@@ -574,6 +576,8 @@ export function LeadsPage() {
                         ) : (
                             <p className="text-sm text-zinc-500 italic">Ingen sammanfattning sparades för samtalet.</p>
                         )}
+
+                        <VoiceCallExtractedData extractedData={selectedVoiceCall?.extracted_data} />
 
                         <div className="space-y-1.5">
                             <p className="text-xs text-zinc-500">Session</p>

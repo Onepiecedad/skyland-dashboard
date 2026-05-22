@@ -26,7 +26,7 @@ export async function fetchLeads(statusFilter = 'alla') {
                 .in('session_uuid', sessionUuids),
             supabase
                 .from('voice_calls')
-                .select('id, session_uuid, summary, transcript, duration_seconds, started_at, ended_at, recording_url, call_source, created_at')
+                .select('id, session_uuid, summary, transcript, duration_seconds, started_at, ended_at, recording_url, call_source, created_at, extracted_data')
                 .in('session_uuid', sessionUuids)
                 .order('created_at', { ascending: false }),
         ]);
@@ -57,7 +57,7 @@ export async function fetchLeads(statusFilter = 'alla') {
 export async function fetchUnlinkedVoiceCalls() {
     const { data, error } = await supabase
         .from('voice_calls')
-        .select('id, session_uuid, provider, external_call_id, call_source, started_at, ended_at, duration_seconds, transcript, summary, recording_url, created_at')
+        .select('id, session_uuid, provider, external_call_id, call_source, started_at, ended_at, duration_seconds, transcript, summary, recording_url, created_at, extracted_data')
         .is('prospect_id', null)
         .is('customer_id', null)
         .order('created_at', { ascending: false })

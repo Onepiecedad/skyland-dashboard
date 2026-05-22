@@ -14,6 +14,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { customerDetailAPI } from '../lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { VoiceCallExtractedData } from '../components/VoiceCallExtractedData';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -549,6 +550,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
                                                                             {formatDuration(call.duration_seconds) && <span>{formatDuration(call.duration_seconds)}</span>}
                                                                         </div>
                                                                     </div>
+                                                                    <VoiceCallExtractedData extractedData={call.extracted_data} />
                                                                     {call.summary && (
                                                                         <p className="mt-1 text-xs text-zinc-300 leading-relaxed">{call.summary}</p>
                                                                     )}
@@ -611,6 +613,7 @@ export function CustomerDetailPanel({ customerId, onDeleted, showBackButton = tr
                                         ) : (
                                             <p className="text-xs text-zinc-500 italic">Ingen sammanfattning sparades.</p>
                                         )}
+                                        <VoiceCallExtractedData extractedData={call.extracted_data} />
                                         {call.recording_url && (
                                             <div className="mt-2 mb-1">
                                                 <audio controls src={call.recording_url} className="h-8 w-full max-w-[240px]" preload="none" />

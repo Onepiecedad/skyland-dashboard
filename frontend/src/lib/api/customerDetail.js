@@ -31,7 +31,7 @@ export async function fetchCustomerDetail(customerId) {
     const voiceQueries = [
         supabase
             .from('voice_calls')
-            .select('id, session_uuid, prospect_id, customer_id, summary, transcript, duration_seconds, started_at, ended_at, recording_url, call_source, created_at')
+            .select('id, session_uuid, prospect_id, customer_id, summary, transcript, duration_seconds, started_at, ended_at, recording_url, call_source, created_at, extracted_data')
             .eq('customer_id', customerId)
             .order('created_at', { ascending: false }),
     ];
@@ -40,7 +40,7 @@ export async function fetchCustomerDetail(customerId) {
         voiceQueries.push(
             supabase
                 .from('voice_calls')
-                .select('id, session_uuid, prospect_id, customer_id, summary, transcript, duration_seconds, started_at, ended_at, recording_url, call_source, created_at')
+                .select('id, session_uuid, prospect_id, customer_id, summary, transcript, duration_seconds, started_at, ended_at, recording_url, call_source, created_at, extracted_data')
                 .in('prospect_id', prospectIds)
                 .order('created_at', { ascending: false })
         );
