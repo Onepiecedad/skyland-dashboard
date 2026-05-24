@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent } from '../components/ui/card';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { leadsAPI } from '../lib/api';
+import { fetchBookingsByEmail } from '../lib/api/calendar';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DashboardShell } from '../components/DashboardShell';
 import { VoiceCallExtractedData } from '../components/VoiceCallExtractedData';
@@ -54,6 +55,32 @@ function formatDuration(durationSeconds) {
     return `${minutes}m ${seconds}s`;
 }
 
+function formatBookingTime(isoString) {
+    return new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Stockholm',
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    }).format(new Date(isoString));
+}
+
+function LinkedBookingCard({ booking, onNavigate }) {
+    const startIso = booking.start || booking.startTime;
+    return (
+        <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 gap-3">
+            <div>
+                <p className="text-xs font-medium text-primary mb-0.5">Möte bokat</p>
+                <p className="text-sm text-zinc-200">{formatBookingTime(startIso)}</p>
+            </div>
+            <button
+                onClick={onNavigate}
+                className="text-xs text-primary hover:text-primary/80 transition-colors shrink-0"
+            >
+                Visa i kalender →
+            </button>
+        </div>
+    );
+}
+
 export function LeadsPage() {
     const [statusFilter, setStatusFilter] = useState('alla');
 
@@ -81,6 +108,29 @@ export function LeadsPage() {
     const leads = leadsQuery.data || [];
     const unlinkedVoiceCalls = unlinkedVoiceCallsQuery.data || [];
     const loading = leadsQuery.isLoading;
+
+    // Resolve linked Cal.com booking for whichever modal is open
+    const linkedBookingEmail = useMemo(() => {
+        if (selectedVoiceCall?.extracted_data?.meeting_requested && selectedVoiceCall.extracted_data.email)
+            return selectedVoiceCall.extracted_data.email;
+        if (modalLead?.latest_voice_call?.extracted_data?.meeting_requested && modalLead.latest_voice_call.extracted_data.email)
+            return modalLead.latest_voice_call.extracted_data.email;
+        return null;
+    }, [selectedVoiceCall, modalLead]);
+
+    const linkedBookingQuery = useQuery({
+        queryKey: ['booking-by-email', linkedBookingEmail],
+        queryFn: () => fetchBookingsByEmail(linkedBookingEmail),
+        enabled: !!linkedBookingEmail,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const linkedBooking = useMemo(() => {
+        if (!linkedBookingQuery.data) return null;
+        return [...linkedBookingQuery.data]
+            .filter(b => b.status !== 'cancelled' && b.status !== 'declined')
+            .sort((a, b) => new Date(a.start || a.startTime) - new Date(b.start || b.startTime))[0] || null;
+    }, [linkedBookingQuery.data]);
 
     useEffect(() => {
         const channel = supabase
@@ -194,6 +244,12 @@ export function LeadsPage() {
     };
 
     const allSelected = leads.length > 0 && leads.every(l => selectedIds.has(l.id));
+
+    const navigateToCalendar = () => {
+        setSelectedVoiceCall(null);
+        setModalLead(null);
+        navigate('/calendar');
+    };
 
     const openConvertModal = (lead) => {
         setConvertingLead(lead);
@@ -482,6 +538,9 @@ export function LeadsPage() {
                                     </div>
                                 </div>
                                 <VoiceCallExtractedData extractedData={modalLead.latest_voice_call.extracted_data} />
+                                {linkedBooking && (
+                                    <LinkedBookingCard booking={linkedBooking} onNavigate={navigateToCalendar} />
+                                )}
                                 {modalLead.latest_voice_call.summary ? (
                                     <p className="text-sm text-zinc-300 leading-relaxed">{modalLead.latest_voice_call.summary}</p>
                                 ) : (
@@ -582,6 +641,10 @@ export function LeadsPage() {
                         </div>
 
                         <VoiceCallExtractedData extractedData={selectedVoiceCall?.extracted_data} />
+
+                        {linkedBooking && (
+                            <LinkedBookingCard booking={linkedBooking} onNavigate={navigateToCalendar} />
+                        )}
 
                         {selectedVoiceCall?.summary && (
                             <div>
