@@ -34,9 +34,17 @@ export const PROJECT_TYPES = [
 ];
 
 export const INDUSTRIES = [
-    'Livsmedel', 'Marin service', 'Artist', 'Event/Upplevelser',
-    'Industriservice', 'Bygg & fastighet', 'Hälsa & välmående',
-    'Handel & e-handel', 'Konsultation', 'Övrigt',
+    'Bygg & Fastighet',
+    'Hotell & Besöksnäring',
+    'Livsmedel & Restaurang',
+    'Skönhet & Välmående',
+    'Tjänster & Konsult',
+    'Handel & E-handel',
+    'Vård & Omsorg',
+    'Transport & Logistik',
+    'Industri & Tillverkning',
+    'Utbildning',
+    'Övrigt',
 ];
 
 export const TYPE_CONFIG = {

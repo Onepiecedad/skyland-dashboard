@@ -12,7 +12,7 @@ export function VoiceCallExtractedData({ extractedData }) {
     const hasContent = Boolean(
         extractedData.person_name ||
         extractedData.company_name ||
-        extractedData.industry ||
+        (extractedData.industry && extractedData.industry !== 'Övrigt') ||
         extractedData.email ||
         extractedData.current_process ||
         extractedData.pain_points_summary ||
@@ -41,7 +41,7 @@ export function VoiceCallExtractedData({ extractedData }) {
                     </div>
                 )}
 
-                {extractedData.industry && (
+                {extractedData.industry && extractedData.industry !== 'Övrigt' && (
                     <div>
                         <p className="text-[11px] text-zinc-500 mb-1">Bransch</p>
                         <p className="text-sm text-zinc-200">{extractedData.industry}</p>
