@@ -75,7 +75,9 @@ export function CalendarPage() {
     const bookingsByDate = useMemo(() => {
         const map = {};
         for (const booking of bookings) {
-            const key = getLocalDateKey(booking.startTime);
+            const startIso = booking.start || booking.startTime;
+            if (!startIso) continue;
+            const key = getLocalDateKey(startIso);
             if (!map[key]) map[key] = [];
             map[key].push(booking);
         }
@@ -87,7 +89,7 @@ export function CalendarPage() {
     const todayKey = toDateKey(today);
     const selectedKey = selectedDate ? toDateKey(selectedDate) : null;
     const selectedBookings = selectedKey
-        ? [...(bookingsByDate[selectedKey] || [])].sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
+        ? [...(bookingsByDate[selectedKey] || [])].sort((a, b) => new Date(a.start || a.startTime) - new Date(b.start || b.startTime))
         : [];
 
     function prevMonth() {
@@ -243,7 +245,7 @@ export function CalendarPage() {
                                             <div className="flex items-center gap-4 text-xs text-zinc-500">
                                                 <span className="flex items-center gap-1">
                                                     <Clock className="h-3 w-3" />
-                                                    {formatTime(booking.startTime)} – {formatTime(booking.endTime)}
+                                                    {formatTime(booking.start || booking.startTime)} – {formatTime(booking.end || booking.endTime)}
                                                 </span>
                                                 {meetUrl && (
                                                     <a

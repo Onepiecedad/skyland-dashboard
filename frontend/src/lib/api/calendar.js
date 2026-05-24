@@ -16,5 +16,7 @@ export async function fetchBookings(start, end) {
 
     if (!res.ok) throw new Error(`Cal.com API ${res.status}`);
     const json = await res.json();
-    return json.data || [];
+    // v2 returns either data: [...] or data: { bookings: [...] }
+    const raw = json.data;
+    return Array.isArray(raw) ? raw : (raw?.bookings || []);
 }
