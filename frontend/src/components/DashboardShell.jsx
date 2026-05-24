@@ -32,6 +32,12 @@ export function DashboardShell({ children, contentClassName = 'max-w-5xl mx-auto
                             >
                                 Kunder
                             </Link>
+                            <Link
+                                to="/calendar"
+                                className={`text-sm font-medium transition-colors ${location.pathname === '/calendar' ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}
+                            >
+                                Kalender
+                            </Link>
                         </nav>
                     </div>
                     <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-500 hover:text-zinc-200">
