@@ -246,48 +246,62 @@ export function LeadsPage() {
                             </CardContent>
                         </Card>
                     ) : (
-                        <div className="space-y-1.5">
-                            {unlinkedVoiceCalls.map((call) => (
-                                <div
-                                    key={call.id}
-                                    className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border/40 bg-card/30 backdrop-blur-sm hover:border-border/60 hover:bg-card/50 transition-all cursor-pointer"
-                                    onClick={() => setSelectedVoiceCall(call)}
-                                >
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-0.5">
-                                            <span className="font-medium text-sm truncate">
-                                                {call.summary?.trim() || 'Röstsamtal utan sammanfattning'}
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
-                                            {call.created_at && (
-                                                <time dateTime={call.created_at} title={new Date(call.created_at).toLocaleString('sv-SE')}>
-                                                    {formatDistanceToNow(new Date(call.created_at), { addSuffix: true, locale: sv })}
-                                                </time>
-                                            )}
-                                            {formatDuration(call.duration_seconds) && (
-                                                <span>{formatDuration(call.duration_seconds)}</span>
-                                            )}
-                                            <span className="font-mono text-[11px] text-zinc-600 truncate max-w-[180px]">
-                                                {call.session_uuid}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">
-                                            Okopplat
-                                        </span>
-                                        <button
-                                            onClick={e => { e.stopPropagation(); handleDeleteVoiceCall(call.id); }}
-                                            className="text-zinc-700 hover:text-red-400 transition-colors"
-                                            aria-label="Radera röstsamtal"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="space-y-2">
+                            {unlinkedVoiceCalls.map((call) => {
+                                const extracted = call.extracted_data || {};
+                                return (
+                                    <Card
+                                        key={call.id}
+                                        className="border-border/40 bg-card/30 backdrop-blur-sm hover:border-primary/25 hover:bg-card/50 transition-all cursor-pointer"
+                                        onClick={() => setSelectedVoiceCall(call)}
+                                    >
+                                        <CardContent className="p-4">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <span className="font-medium text-sm">
+                                                            {extracted.person_name || extracted.company_name || 'Okänd person'}
+                                                        </span>
+                                                        {extracted.company_name && extracted.person_name && (
+                                                            <span className="flex items-center gap-1 text-xs text-zinc-500">
+                                                                <Building2 className="h-3 w-3 shrink-0" />
+                                                                {extracted.company_name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        {extracted.industry && extracted.industry !== 'Övrigt' && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border bg-zinc-500/10 text-zinc-400 border-zinc-500/20">
+                                                                {extracted.industry}
+                                                            </span>
+                                                        )}
+                                                        {call.created_at && (
+                                                            <time className="text-xs text-zinc-500" dateTime={call.created_at}>
+                                                                {formatDistanceToNow(new Date(call.created_at), { addSuffix: true, locale: sv })}
+                                                            </time>
+                                                        )}
+                                                        {formatDuration(call.duration_seconds) && (
+                                                            <span className="text-xs text-zinc-500">{formatDuration(call.duration_seconds)}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">
+                                                        Okopplat
+                                                    </span>
+                                                    <button
+                                                        onClick={e => { e.stopPropagation(); handleDeleteVoiceCall(call.id); }}
+                                                        className="text-zinc-700 hover:text-red-400 transition-colors"
+                                                        aria-label="Radera röstsamtal"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -337,55 +351,55 @@ export function LeadsPage() {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                         {leads.map(lead => (
-                            <div
+                            <Card
                                 key={lead.id}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all ${selectedIds.has(lead.id) ? 'border-primary/30 bg-primary/5' : 'border-border/40 bg-card/30 backdrop-blur-sm hover:border-border/60 hover:bg-card/50'}`}
+                                className={`transition-all ${selectedIds.has(lead.id) ? 'border-primary/30 bg-primary/5' : 'border-border/40 bg-card/30 backdrop-blur-sm hover:border-primary/25 hover:bg-card/50'}`}
                             >
-                                {/* Checkbox */}
-                                <input
-                                    type="checkbox"
-                                    checked={selectedIds.has(lead.id)}
-                                    onChange={() => toggleSelect(lead.id)}
-                                    className="h-3.5 w-3.5 accent-zinc-400 cursor-pointer shrink-0"
-                                />
+                                <CardContent className="p-4">
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(lead.id)}
+                                            onChange={() => toggleSelect(lead.id)}
+                                            className="h-3.5 w-3.5 accent-zinc-400 cursor-pointer shrink-0"
+                                        />
 
-                                {/* Main content */}
-                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setModalLead(lead)}>
-                                    <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="font-medium text-sm truncate">{lead.name || 'Okänd'}</span>
-                                        <ScoreBadge score={lead.score} />
+                                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setModalLead(lead)}>
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <span className="font-medium text-sm">{lead.name || 'Okänd'}</span>
+                                                <ScoreBadge score={lead.score} />
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                {lead.company && (
+                                                    <span className="flex items-center gap-1 text-xs text-zinc-500">
+                                                        <Building2 className="h-3 w-3 shrink-0" />{lead.company}
+                                                    </span>
+                                                )}
+                                                {lead.created_at && (
+                                                    <time className="text-xs text-zinc-500" dateTime={lead.created_at}>
+                                                        {formatDistanceToNow(new Date(lead.created_at), { addSuffix: true, locale: sv })}
+                                                    </time>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 shrink-0 cursor-pointer" onClick={() => setModalLead(lead)}>
+                                            <SourceBadge source={lead.source} />
+                                            <StatusBadge status={lead.status || 'ny'} />
+                                        </div>
+
+                                        <button
+                                            onClick={e => { e.stopPropagation(); handleDeleteLead(lead.id); }}
+                                            className="text-zinc-700 hover:text-red-400 transition-colors shrink-0"
+                                            aria-label="Radera lead"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
                                     </div>
-                                    <div className="flex items-center gap-3 text-xs text-zinc-500">
-                                        {lead.company && (
-                                            <span className="flex items-center gap-1 truncate">
-                                                <Building2 className="h-3 w-3 shrink-0" />{lead.company}
-                                            </span>
-                                        )}
-                                        {lead.created_at && (
-                                            <time dateTime={lead.created_at} title={new Date(lead.created_at).toLocaleString('sv-SE')}>
-                                                {formatDistanceToNow(new Date(lead.created_at), { addSuffix: true, locale: sv })}
-                                            </time>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Source + status — click opens modal */}
-                                <div className="flex items-center gap-2 shrink-0 cursor-pointer" onClick={() => setModalLead(lead)}>
-                                    <SourceBadge source={lead.source} />
-                                    <StatusBadge status={lead.status || 'ny'} />
-                                </div>
-
-                                {/* Delete */}
-                                <button
-                                    onClick={e => { e.stopPropagation(); handleDeleteLead(lead.id); }}
-                                    className="text-zinc-700 hover:text-red-400 transition-colors shrink-0"
-                                    aria-label="Radera lead"
-                                >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                                </CardContent>
+                            </Card>
                         ))}
                     </div>
                 )}
@@ -474,13 +488,15 @@ export function LeadsPage() {
                                     <p className="text-sm text-zinc-500 italic">Ingen sammanfattning sparades för samtalet.</p>
                                 )}
                                 {modalLead.latest_voice_call.transcript && (
-                                    <details className="text-xs text-zinc-400">
-                                        <summary className="cursor-pointer select-none text-zinc-500 hover:text-zinc-300">
+                                    <details>
+                                        <summary className="cursor-pointer select-none text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
                                             Visa transcript
                                         </summary>
-                                        <pre className="mt-2 whitespace-pre-wrap font-sans text-xs leading-relaxed text-zinc-400">
-                                            {modalLead.latest_voice_call.transcript}
-                                        </pre>
+                                        <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-border/50 bg-card/40 p-3">
+                                            <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-zinc-300">
+                                                {modalLead.latest_voice_call.transcript}
+                                            </pre>
+                                        </div>
                                     </details>
                                 )}
                             </div>
@@ -542,7 +558,11 @@ export function LeadsPage() {
                 <DialogContent className="sm:max-w-lg border-primary/15 shadow-[0_0_60px_rgba(8,146,90,0.15),0_0_120px_rgba(8,146,90,0.06),0_8px_32px_rgba(0,0,0,0.5)]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 pr-6">
-                            <span className="truncate">Okopplat röstsamtal</span>
+                            <span className="truncate">
+                                {selectedVoiceCall?.extracted_data?.person_name ||
+                                 selectedVoiceCall?.extracted_data?.company_name ||
+                                 'Okopplat röstsamtal'}
+                            </span>
                         </DialogTitle>
                     </DialogHeader>
 
@@ -561,21 +581,14 @@ export function LeadsPage() {
                             </span>
                         </div>
 
-                        {selectedVoiceCall?.summary ? (
-                            <div className="bg-card/60 border border-border/50 rounded-lg p-3">
-                                <p className="text-xs text-zinc-500 mb-1.5">Sammanfattning</p>
-                                <p className="text-sm text-zinc-300 leading-relaxed">{selectedVoiceCall.summary}</p>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-zinc-500 italic">Ingen sammanfattning sparades för samtalet.</p>
-                        )}
-
                         <VoiceCallExtractedData extractedData={selectedVoiceCall?.extracted_data} />
 
-                        <div className="space-y-1.5">
-                            <p className="text-xs text-zinc-500">Session</p>
-                            <p className="text-xs font-mono text-zinc-400 break-all">{selectedVoiceCall?.session_uuid}</p>
-                        </div>
+                        {selectedVoiceCall?.summary && (
+                            <div>
+                                <p className="text-xs text-zinc-500 mb-1.5">Sammanfattning</p>
+                                <p className="text-sm text-zinc-200 leading-relaxed">{selectedVoiceCall.summary}</p>
+                            </div>
+                        )}
 
                         {selectedVoiceCall?.recording_url && (
                             <div className="space-y-1.5">
@@ -585,14 +598,16 @@ export function LeadsPage() {
                         )}
 
                         {selectedVoiceCall?.transcript && (
-                            <div>
-                                <p className="text-xs text-zinc-500 mb-1.5">Transcript</p>
-                                <div className="max-h-64 overflow-y-auto rounded-lg border border-border/50 bg-card/40 p-3">
-                                    <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-zinc-400">
+                            <details>
+                                <summary className="cursor-pointer select-none text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                                    Visa transcript
+                                </summary>
+                                <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-border/50 bg-card/40 p-3">
+                                    <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-zinc-300">
                                         {selectedVoiceCall.transcript}
                                     </pre>
                                 </div>
-                            </div>
+                            </details>
                         )}
                     </div>
                 </DialogContent>
