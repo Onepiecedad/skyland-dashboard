@@ -116,6 +116,19 @@ export async function deleteLeads(leadIds) {
     }
 }
 
+export async function deleteVoiceCall(callId) {
+    const { data, error } = await supabase
+        .from('voice_calls')
+        .delete()
+        .eq('id', callId)
+        .select('id');
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+        throw new Error('Röstsamtal kunde inte raderas');
+    }
+}
+
 export async function convertLeadToCustomer(lead, form, projectTypes) {
     const { data: customer, error: customerError } = await supabase
         .from('customers')

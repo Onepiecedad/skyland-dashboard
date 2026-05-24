@@ -140,6 +140,18 @@ export function LeadsPage() {
         onError: (error) => toast.error(error?.message || 'Kunde inte radera leads'),
     });
 
+    const deleteVoiceCallMutation = useMutation({
+        mutationFn: (id) => leadsAPI.deleteVoiceCall(id),
+        onSuccess: (_data, id) => {
+            toast.success('Röstsamtal raderat');
+            queryClient.setQueriesData({ queryKey: ['unlinked-voice-calls'] }, (old) =>
+                Array.isArray(old) ? old.filter((call) => call.id !== id) : old
+            );
+            queryClient.invalidateQueries({ queryKey: ['unlinked-voice-calls'] });
+        },
+        onError: (error) => toast.error(error?.message || 'Kunde inte radera röstsamtal'),
+    });
+
     const convertLeadMutation = useMutation({
         mutationFn: ({ lead, form }) => leadsAPI.convertLeadToCustomer(lead, form, PROJECT_TYPES),
         onSuccess: ({ customer }) => {
@@ -159,6 +171,11 @@ export function LeadsPage() {
     const handleDeleteLead = async (id) => {
         if (!window.confirm('Radera lead permanent?')) return;
         deleteLeadMutation.mutate(id);
+    };
+
+    const handleDeleteVoiceCall = (id) => {
+        if (!window.confirm('Radera röstsamtal permanent?')) return;
+        deleteVoiceCallMutation.mutate(id);
     };
 
     const handleBulkDelete = async () => {
@@ -261,6 +278,13 @@ export function LeadsPage() {
                                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border bg-amber-500/10 text-amber-300 border-amber-500/20">
                                             Okopplat
                                         </span>
+                                        <button
+                                            onClick={e => { e.stopPropagation(); handleDeleteVoiceCall(call.id); }}
+                                            className="text-zinc-700 hover:text-red-400 transition-colors"
+                                            aria-label="Radera röstsamtal"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
                                     </div>
                                 </div>
                             ))}
